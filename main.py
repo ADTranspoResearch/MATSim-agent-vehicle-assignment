@@ -6,7 +6,7 @@ indicated vehicle ownership data.
 import gzip
 import xml.etree.ElementTree as ET
 
-from population import get_home
+from population import get_home, get_demos
 from vehicle_assignment import get_veh_from_xy
 
 # Modify these variables to alter how the module functions.
@@ -25,7 +25,8 @@ root = tree.getroot()
 # to the XML file.
 for person in root.findall(".//person"):
     home_xy = get_home(person)
-    vehicle = get_veh_from_xy(home_xy, SEED)
+    demographics = get_demos(person)
+    vehicle = get_veh_from_xy(home_xy, demographics, SEED)
     person.set("vehicle", str(vehicle))
 
 # Save the modified XML file.

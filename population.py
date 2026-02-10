@@ -4,6 +4,25 @@ Module contains functions for parsing and analyzing MATSim population.
 
 import xml.etree.ElementTree as ET
 
+def get_demos(person: ET.Element):
+    """
+    Takes a "person" XML tree as input and returns gender and age.
+
+    :param person: XML Element of person from population file.
+
+    Returns (gender, age) (string, int)
+    """ 
+
+    try:
+        gender = person.get("gender")
+        age = int(person.get("age"))
+    except(KeyError) as e:
+        raise (
+            KeyError(f"Agent {person.find('id')} does not gender and/or age.")
+        ) from e
+
+    return (gender,age)
+
 
 def get_home(person: ET.Element):
     """
