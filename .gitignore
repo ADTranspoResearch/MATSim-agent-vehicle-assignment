@@ -1,3 +1,8 @@
+# Ignore vehicle ownership files, data should be stored locally.
+# see sample_ownership.csv for ownership data format.
+vehicle_data/ownership/*
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
