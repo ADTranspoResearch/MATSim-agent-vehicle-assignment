@@ -4,7 +4,13 @@ input agent and agent demographics.
 """
 
 import random
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
+from 
 
 def get_fsa_from_xy(location):
     """
@@ -28,10 +34,27 @@ def get_prob_from_demo(fsa, demographics):
             probabilities)
     """
 
-    # Qi you can change the orders here or assign them dynamically from the dataframe.
-    vehicle_labels = ("ice_sedan","hev_sedan", "ice_suv", "hev_suv", "van/pickup", "electric")
-    vehicle_probs = ("placeholder")
-    return (vehicle_labels,vehicle_probs)
+    gender, age = demographics
+
+    try:
+        row = pivot_veh_dist.loc[(fsa, gender, age)]
+        active_vehicles = row[row > 0]
+        if active_vehicles.empty:
+            raise KeyError("No vehicle types with probability > 0")  # TODO: Exclude age-specific vehicle distribution constraints.
+        vehicle_labels = tuple(active_vehicles.index)
+        vehicle_probs = tuple(float(p) for p in active_vehicles.values)
+
+        return (vehicle_labels, vehicle_probs)
+    
+    except KeyError:
+        error_msg = f"Cannot find vehicle data for FSA: {fsa}, Gender: {gender}, Age: {age}."
+        raise RuntimeError(error_msg)
+
+
+agent_demo = ('F', 34) 
+labels, probs = get_prob_from_demo('G0V', agent_demo)
+print(labels)
+print(probs)
 
 
 def get_veh_from_xy(location, demographics, seed):
