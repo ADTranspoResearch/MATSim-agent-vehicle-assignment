@@ -4,13 +4,7 @@ input agent and agent demographics.
 """
 
 import random
-import sys
-import os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-
-from 
+from vehicle_data.vehicle_distribution import pivot_veh_dist
 
 def get_fsa_from_xy(location):
     """
