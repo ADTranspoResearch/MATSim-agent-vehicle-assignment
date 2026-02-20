@@ -4,17 +4,13 @@ input agent and agent demographics.
 """
 
 import random
-from vehicle_data.vehicle_distribution import pivot_veh_dist
+import pandas as pd
 
-def get_fsa_from_xy(location):
-    """
-    Returns the FSA that the passed coordinate is located inside of.
-    
-    :param location: tuple containing XY coordinates
+vehicle_dist_path = "vehicle_data/veh_dist.parquet"
+pivot_veh_dist = pd.read_parquet(vehicle_dist_path)
 
-    Returns string: FSA code (ex: H1A)
-    """
-    return None
+
+
 
 def get_prob_from_demo(fsa, demographics):
     """
@@ -45,25 +41,24 @@ def get_prob_from_demo(fsa, demographics):
         raise RuntimeError(error_msg)
 
 
-agent_demo = ('F', 34) 
-labels, probs = get_prob_from_demo('G0V', agent_demo)
-print(labels)
-print(probs)
 
 
-def get_veh_from_xy(location, demographics, seed):
+
+
+
+def get_veh_from_fsa(demographics, fsa, seed):
     """
     Function returns randomly selected vehicle type based on home
     location.
 
     location (set): XY coordinate of person home location.
+    demographics (set): gender & age category of agent.
+    fsa (string): forward sorting area of user home location
     seed (int): random seed for reproducibility of random selection.
-    demographic (set): gender & age category of agent.
+    
 
     returns (string): selected vehicle type.
     """
-
-    fsa = get_fsa_from_xy(location)
 
     # Setting seed for reproduction.
     random.seed(seed)

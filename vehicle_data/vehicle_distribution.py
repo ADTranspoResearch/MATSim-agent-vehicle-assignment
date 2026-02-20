@@ -1,8 +1,8 @@
 import pandas as pd
 import os
 base_dir = os.path.dirname(os.path.abspath(__file__))
-csv_path = os.path.join(base_dir, 'sample_ownership.csv')
-df = (pd.read_csv(csv_path)
+csv_path = os.path.join(base_dir, "ownership/McGill_SAAQ_2013_2024-01-10.csv")
+df = (pd.read_csv(csv_path, sep=";", encoding="utf-16")
       .loc[:, ['RTA', 'Genre', 'AgeProprio (groupes)', 'Hybrid Type', 'Motorisation', 'Classe principale', 'Usage']]
       .rename(columns={'RTA': 'fsa', 'Genre': 'gender', 'AgeProprio (groupes)': 'age_group'})
       .query("Usage != 'Commercial' and age_group != 'Commercial'")
@@ -80,6 +80,6 @@ pivot_veh_dist = pivot_veh_dist.sort_index()
 if __name__ == "__main__":
     print("Testing distribution output...")
     print(pivot_veh_dist.head())
-    pivot_veh_dist.to_csv(os.path.join(base_dir, 'veh_dist.csv'))
+    pivot_veh_dist.to_parquet(os.path.join(base_dir, 'veh_dist.parquet'))
 
 
