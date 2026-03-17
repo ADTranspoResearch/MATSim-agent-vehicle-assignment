@@ -6,6 +6,7 @@ import pandas as pd
 import geopandas as gpd
 import xml.etree.ElementTree as ET
 from shapely import Point
+import matplotlib.pyplot as plt
 
 
 def get_demos(person: ET.Element):
@@ -18,15 +19,19 @@ def get_demos(person: ET.Element):
     """
 
     try:
-        gender = person.get("sex").upper()
+        sex_elem = person.find("./attributes/attribute[@name='sex']")
+        gender = sex_elem.text.upper() if sex_elem is not None else None
         # Convert gender to french
-        if gender == "M":
+        if gender == "1":
+            gender = "F"
+        else:
             gender = "H"
 
-        age = int(person.get("age"))
+        age = 40 # TODO: Find mapping for age range in quebec data
+
     except KeyError as e:
         raise (
-            KeyError(f"Agent {person.find('id')} does not gender and/or age.")
+            KeyError(f"Agent {person.find("./attributes/attribute[@name='sex']")} does not gender and/or age.")
         ) from e
 
     return (gender, age)
@@ -43,7 +48,7 @@ def get_home(person: ET.Element):
 
     plan = person.find("plan")
     found_home = False
-    for activity in plan.findall(".//act"):
+    for activity in plan.findall(".//activity"):
         # Only looking for first home based activity.
         if activity.get("type") == "home":
             xy = (float(activity.get("x")), float(activity.get("y")))
@@ -53,7 +58,7 @@ def get_home(person: ET.Element):
         return xy
     else:
         raise (
-            KeyError(f"Agent {person.find('id')} does not have home activity in plan.")
+            KeyError(f"Agent {person.get('id')} does not have home activity in plan.")
         )
 
 
@@ -70,7 +75,11 @@ def get_fsa_table(root):
     """
 
     try:
-        fsa_table = pd.read_csv("FSA/agent_id_fsa_table.csv", index_col=0)
+        fsa_table = pd.read_csv(
+            "FSA/agent_id_fsa_table.csv",
+            index_col=0,
+            )
+        fsa_table.index = fsa_table.index.astype(str)
     except FileNotFoundError:
         print("No agent_fsa table found, generating table")
         fsa_table = build_fsa_table(root)
@@ -95,12 +104,19 @@ def build_fsa_table(root: ET.ElementTree):
     home_dict = {
         person.get("id"): Point(get_home(person)) for person in root.iter("person")
     }
-    home_gdf = gpd.GeoDataFrame.from_dict(
-        home_dict, orient="index", geometry=0, crs="EPSG:3347"
+    home_gdf = gpd.GeoDataFrame(
+        {
+            "geometry": list(home_dict.values())
+        },
+        index=list(home_dict.keys()),
+        geometry="geometry",
+        crs="EPSG:32187"
     )
     province_fsa_gdf = gpd.read_file("FSA/quebec_fsa/quebec_fsa.shp")
 
-    joined = gpd.sjoin(home_gdf, province_fsa_gdf, how="left", predicate="within")
+    province_fsa_gdf = province_fsa_gdf.to_crs(home_gdf.crs)
+
+    joined = gpd.sjoin(home_gdf, province_fsa_gdf, how="left", predicate="intersects")
     fsa_df = joined["CFSAUID"].drop(columns="geometry")
     fsa_df.to_csv("FSA/agent_id_fsa_table.csv")
     return fsa_df
