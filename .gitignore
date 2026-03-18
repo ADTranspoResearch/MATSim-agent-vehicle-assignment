@@ -5,7 +5,8 @@ vehicle_data/ownership/*
 # Hiding random sample generation code.
 random_sample.py
 
-
+MATSim/**/*.xml
+FSA/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
