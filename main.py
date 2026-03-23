@@ -64,7 +64,7 @@ for child in root:
         if vid in person_vehicle_dict.keys():
             child.set("type", person_vehicle_dict[vid])
 
-
+ET.register_namespace('', "http://www.matsim.org/files/dtd")
 tree = ET.ElementTree(root)
 tree.write(
     f"output/vehicles_updated_{SCN_YEAR}_{SCN_CASE}.xml",
