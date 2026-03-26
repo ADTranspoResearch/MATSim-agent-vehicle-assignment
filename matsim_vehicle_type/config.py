@@ -20,8 +20,9 @@ VEH_NAME = "output_allVehicles.xml.gz"
 
 
 DATA_DIR = ROOT / "data"
-POP_DIR = DATA_DIR / "MATSim" / "population"
-VEH_DIR = DATA_DIR / "MATSim" / "vehicles"
+MATSIM_DIR = DATA_DIR / "MATSim"
+POP_DIR = MATSIM_DIR / "population"
+VEH_DIR = MATSIM_DIR / "vehicles"
 
 
 
