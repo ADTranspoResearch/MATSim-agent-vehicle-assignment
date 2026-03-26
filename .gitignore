@@ -1,12 +1,12 @@
 # Ignore vehicle ownership files, data should be stored locally.
 # see sample_ownership.csv for ownership data format.
-vehicle_data/ownership/*
+data/vehicles/ownership/*
 
 # Hiding random sample generation code.
 random_sample.py
 
 MATSim/**/*.xml
-FSA/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
