@@ -1,0 +1,5 @@
+.DS_Store
+.ipynb_checkpoints/
+
+# Heavy local caches derived from SAAQ data
+.cache/*.pkl
