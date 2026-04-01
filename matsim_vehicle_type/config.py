@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Modify these variables to alter how the module functions.
 SEED = 2
 # Scenario Data.
-SCN_YEAR = 2021
+SCN_YEAR = 2035
 # Possible case options =
 # REF : Reference scenario (only when using historical vehicle data)
 # BAU : buisness as usual,
