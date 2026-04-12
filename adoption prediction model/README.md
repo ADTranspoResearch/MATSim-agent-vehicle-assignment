@@ -8,10 +8,12 @@ This folder has been reduced to the replacement-dynamics workflow only.
   Cached SAAQ datasets used by the notebooks.
 
 - `notebooks/`
-  The three replacement-dynamics notebooks:
+  The replacement-dynamics notebooks:
   - [replacement_dynamics_adoption_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_adoption_model.ipynb)
   - [replacement_dynamics_adoption_model_fsa.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_adoption_model_fsa.ipynb)
   - [replacement_dynamics_entry_exit_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_entry_exit_model.ipynb)
+  - [replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_calibrated_model.ipynb)
+  - [replacement_dynamics_ev_population_scenarios.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_population_scenarios.ipynb)
 
 - `validation_outputs/`
   Outputs produced by the replacement-dynamics notebooks:
@@ -30,6 +32,12 @@ This folder has been reduced to the replacement-dynamics workflow only.
 
 3. [replacement_dynamics_entry_exit_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_entry_exit_model.ipynb)
    The stricter version that models entries and disposals separately year by year using `Entrant`/`Neuf` and `Sortant`.
+
+4. [replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_calibrated_model.ipynb)
+   The replacement model with the full future entry-share mix calibrated from external quarterly new-vehicle registrations, 2017 to 2025 Q1, and total fleet growth linked to the Quebec population reference.
+
+5. [replacement_dynamics_ev_population_scenarios.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_population_scenarios.ipynb)
+   The EV-calibrated replacement model with total-fleet trajectories linked to Quebec population projection scenarios instead of a simple linear fleet-growth assumption.
 
 ## Cache files
 
