@@ -10,5 +10,8 @@ efficiency_df = pd.read_csv(efficiency_path)
 emissions_df = aggregate_emissions(emissions_path)
 #emissions_df = add_efficiency(emissions_df, efficiency_df)
 
+# Drop all rows for bus vehicles.
+
+emissions_df = emissions_df.loc[~emissions_df.index.str.startswith("veh_")]
 
 emissions_df.to_csv((OUTPUT_DIR / "agent_aggregated_emissions.csv"))
