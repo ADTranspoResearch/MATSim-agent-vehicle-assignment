@@ -1,52 +1,55 @@
 # Adoption Prediction Model
 
-This folder has been reduced to the replacement-dynamics workflow only.
+This folder now contains one clean prediction workflow with only two notebooks:
 
-## What is kept
+- [province_prediction_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/province_prediction_model.ipynb)
+- [fsa_prediction_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/fsa_prediction_model.ipynb)
+
+## Folder Structure
 
 - `.cache/`
-  Cached SAAQ datasets used by the notebooks.
+  Heavy cached SAAQ files used by the model.
 
 - `datasets/`
-  Local reference datasets used by the calibrated notebook:
+  External reference files used by the calibrated model:
   - [Fig1-NMVRegist.xlsx](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/datasets/Fig1-NMVRegist.xlsx)
   - [1710000901-eng.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/datasets/1710000901-eng.csv)
 
+- `src/prediction_model/`
+  Shared code used by both notebooks:
+  - `config.py`
+  - `data.py`
+  - `province.py`
+  - `fsa.py`
+
 - `notebooks/`
-  Current working notebooks:
-  - [replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_calibrated_model.ipynb)
-  - [fsa_replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/fsa_replacement_dynamics_ev_calibrated_model.ipynb)
-  - [model_validation_2025.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/model_validation_2025.ipynb)
+  The two entry points for running the model.
 
-- `validation_outputs/`
-  Current working outputs:
-  - [replacement_dynamics_ev_calibrated_model](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/replacement_dynamics_ev_calibrated_model)
-  - [fsa_replacement_dynamics_ev_calibrated_model](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/fsa_replacement_dynamics_ev_calibrated_model)
-  - [model_validation_2025](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/model_validation_2025)
-  - [recalibrated_sales_share_forecast](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/recalibrated_sales_share_forecast)
-  - [fsa_model_validation_2025](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/fsa_model_validation_2025)
-  - [replacement_dynamics_presentation](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/replacement_dynamics_presentation)
+- `outputs/`
+  Saved model outputs:
+  - `outputs/province/`
+  - `outputs/fsa/`
 
-## Recommended reading order
+## How To Use
 
-1. [replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/replacement_dynamics_ev_calibrated_model.ipynb)
-   Province-level calibrated replacement-dynamics model using the external Quebec registrations data and population-linked fleet growth.
+1. Open [province_prediction_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/province_prediction_model.ipynb) for the provincial forecast.
+2. Open [fsa_prediction_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/fsa_prediction_model.ipynb) for the FSA forecast.
+3. In either notebook, change:
+   - `FORECAST_END_YEAR`
+   - `SELECTED_YEAR`
+4. In the FSA notebook, you can also change:
+   - `TARGET_FSA`
 
-2. [fsa_replacement_dynamics_ev_calibrated_model.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/fsa_replacement_dynamics_ev_calibrated_model.ipynb)
-   FSA-level calibrated version with hierarchical shrinkage toward the province benchmark.
+The notebooks save the full yearly outputs automatically.
 
-3. [model_validation_2025.ipynb](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/notebooks/model_validation_2025.ipynb)
-   Honest validation notebook comparing the model against observed Quebec adoption data from 2021 to 2025.
+## Main Output Files
 
-4. [replacement_dynamics_presentation](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/validation_outputs/replacement_dynamics_presentation)
-   Presentation-ready figures and PowerPoint outputs summarizing the current workflow.
+Province:
+- [sales_share_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/province/sales_share_by_year.csv)
+- [fleet_share_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/province/fleet_share_by_year.csv)
+- [vehicle_counts_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/province/vehicle_counts_by_year.csv)
 
-## Cache files
-
-The notebooks rely mainly on:
-
-- `saq_vehicle_counts.pkl`
-- `saq_entry_counts.pkl`
-- `saq_entry_full.pkl`
-
-Other cache files were left in place rather than regenerated, but the working replacement-dynamics notebooks are centered on the three files above.
+FSA:
+- [fsa_sales_share_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/fsa/fsa_sales_share_by_year.csv)
+- [fsa_fleet_share_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/fsa/fsa_fleet_share_by_year.csv)
+- [fsa_vehicle_counts_by_year.csv](/Users/natomanzolli/Documents/GitHub/MATSim-agent-vehicle-assignment/adoption prediction model/outputs/fsa/fsa_vehicle_counts_by_year.csv)
