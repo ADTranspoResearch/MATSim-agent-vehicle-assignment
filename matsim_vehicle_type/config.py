@@ -1,5 +1,11 @@
+"""
+Contains configuration parameters that can be adjusted for each run.
+
+Also contains useful imports that other modules can leverage.
+"""
 
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 
 # Modify these variables to alter how the module functions.
@@ -13,21 +19,15 @@ SCN_YEAR = 2035
 # C : Carney scenario
 SCN_CASE = "BAU"
 
+
 POP_NAME = "quebec_population.xml.gz"
 VEH_NAME = "output_allVehicles.xml.gz"
 
 
-
-
+# Useful directories that can be imported directly.
 DATA_DIR = ROOT / "data"
 POP_DIR = DATA_DIR / "MATSim" / "population"
 VEH_DIR = DATA_DIR / "MATSim" / "vehicles"
-
-
-
 POP_FILE = POP_DIR / POP_NAME
-
 VEH_FILE = VEH_DIR / VEH_NAME
-
-
 OUTPUT_DIR = ROOT / "output"

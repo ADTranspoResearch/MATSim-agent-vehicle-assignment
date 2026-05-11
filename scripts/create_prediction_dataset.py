@@ -1,8 +1,20 @@
+"""
+Used to create vehicle ownership distributions for future scenarios.
+
+May be deprecated soon.
+"""
+
 import pandas as pd
-import _setup_path #pylint: disable=unused-import
+import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.config import SCN_YEAR, DATA_DIR, ROOT
 
-prediction_path = ROOT / "adoption prediction model" / "validation_outputs" / "replacement_dynamics_adoption_model_fsa" / "fsa_replacement_dynamics_market_share.csv"
+prediction_path = (
+    ROOT
+    / "adoption prediction model"
+    / "validation_outputs"
+    / "replacement_dynamics_adoption_model_fsa"
+    / "fsa_replacement_dynamics_market_share.csv"
+)
 
 all_predict_df = pd.read_csv(prediction_path)
 

@@ -1,4 +1,9 @@
-import _setup_path #pylint: disable=unused-import
+"""
+Reads the historical vehicle ownership file and calculates the per FSA
+distribution of each vehicle type and saves it to a file.
+"""
+
+import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.config import SCN_YEAR, DATA_DIR
 from matsim_vehicle_type.vehicles.vehicle_distribution import build_vehicle_distribution
 

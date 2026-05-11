@@ -21,7 +21,7 @@ from matsim_vehicle_type.config import (
     OUTPUT_DIR,
 )
 
-def main():
+def assign_matsim_users_vehicle_type():
     random.seed(SEED)
 
     with gzip.open(POP_FILE, "rt", encoding="utf-8") as f:
@@ -65,4 +65,4 @@ def main():
     )
 
 if __name__ == "__main__":
-    main()
+    assign_matsim_users_vehicle_type()
