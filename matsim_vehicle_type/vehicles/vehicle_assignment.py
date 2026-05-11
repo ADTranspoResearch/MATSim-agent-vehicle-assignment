@@ -12,9 +12,20 @@ from matsim_vehicle_type.config import DATA_DIR
 pivot_veh_dist = None
 
 
-def load_veh_dist(year):
+def load_veh_dist(year: int):
     """
     Preloads the appropriate vehicle distribution for get_prob_from_demos.
+
+    Parameters
+    ----------
+    year : int
+        Year of the desired distribution
+
+    Raises
+    ------
+    FileNotFoundError
+        Raises if there does not exist a vehicle distribution for that
+        year.
     """
 
     global pivot_veh_dist  # pylint: disable=global-statement
@@ -30,7 +41,7 @@ def load_veh_dist(year):
         raise FileNotFoundError(f"Missing distribution for {year}")
 
 
-def get_prob_from_demo(fsa):
+def get_prob_from_demo(fsa: str) -> tuple[tuple[str], tuple[float]]:
     """
     Given agetn FSA and age/gender, return the probabilities of owning
     each vehicle type.
@@ -64,7 +75,7 @@ def get_prob_from_demo(fsa):
             raise RuntimeError(error_msg) from e
 
 
-def get_veh_from_fsa(fsa):
+def get_veh_from_fsa(fsa: str) -> str:
     """
     Function returns randomly selected vehicle type based on home
     location.

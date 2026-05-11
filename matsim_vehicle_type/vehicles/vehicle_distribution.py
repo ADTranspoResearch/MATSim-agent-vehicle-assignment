@@ -1,10 +1,34 @@
+"""
+Module used to read vehicle ownership file and return per-FSA vehicle
+type distributions for a given year. 
+"""
+
 import pandas as pd
 
 from matsim_vehicle_type.config import DATA_DIR
 
 
-def get_vehicle_type(row):
+def get_vehicle_type(row: pd.Series) -> str:
+    """
+    Takes the data of a vehicle ownership row and returns the vehicle
+    type to be assigned to that row.
 
+    Determines vehicle type based on the engine (ice, electric, hybrid)
+    the size based on the vehicle classification and then returns the
+    matching vehicle type, or "unknow"
+
+    Parameters
+    ----------
+    row : pd.Series
+        Entire row of the vehicle ownership dataset. Should contain
+        engine type information, vehicle size classification information
+        and hybrid information.
+
+    Returns
+    -------
+    str
+        assigned vehicle type code
+    """
     h_type = str(row.get("Hybrid Type")).lower().strip()
     motor = str(row.get("Motorisation", "")).lower().strip()
     c_main = str(row.get("Classe principale", "")).lower().strip()
@@ -27,14 +51,12 @@ def get_vehicle_type(row):
 
     if h_type == "" and motor == "":
         return "unknow"
-
     if motor == "electrique":
         return "electric"
 
     is_hybrid = (motor in ["hybride", "hybride branchable"]) or (
         motor == "" and h_type != ""
     )
-
     is_icev = motor in ["diesel", "essence", "gaz naturel"]
 
     if is_hybrid:
@@ -57,6 +79,28 @@ def get_vehicle_type(row):
 def build_vehicle_distribution(
     year, vehicle_ownership_path: str, to_file: bool = True
 ) -> pd.DataFrame:
+    """
+    Calculates the per-FSA vehicle ownership distribution for a
+    given vehicle ownership dataset.
+
+    Returns & optionally saves the FSA distributions as a DataFrame to
+    a file.
+
+    Parameters
+    ----------
+    year : int
+        Year of the desired distribution.
+    vehicle_ownership_path : str
+        Relative path to the vehicle ownership files.
+    to_file : bool, optional
+        If true, will save the distributions to a file, by default True
+
+    Returns
+    -------
+    pd.DataFrame
+        Vehicle type distributions sorted by FSA.
+    """
+
     df = (
         pd.read_csv(vehicle_ownership_path, sep=";", encoding="utf-16")
         .loc[

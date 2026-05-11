@@ -1,7 +1,7 @@
 """
 Module contains functions for parsing and analyzing MATSim population.
 """
-
+from pathlib import Path
 import xml.etree.ElementTree as ET
 
 import pandas as pd
@@ -11,7 +11,7 @@ from shapely import Point
 from matsim_vehicle_type.config import DATA_DIR
 
 
-def get_demos(person: ET.Element):
+def get_demos(person: ET.Element) -> tuple[str, int]:
     """
     Takes a "person" XML tree as input and returns gender and age.
 
@@ -41,7 +41,7 @@ def get_demos(person: ET.Element):
     return (gender, age)
 
 
-def get_home(person: ET.Element):
+def get_home(person: ET.Element) -> tuple[float, float]:
     """
     Takes a "person" XML tree as input and returns home XY coord.
 
@@ -66,7 +66,7 @@ def get_home(person: ET.Element):
         )
 
 
-def get_fsa_table(root):
+def get_fsa_table(root: Path) -> pd.DataFrame:
     """
     Reads the FSA lookup table, if it does not exist, builds it and
     saves it.
@@ -88,7 +88,7 @@ def get_fsa_table(root):
     return fsa_table
 
 
-def build_fsa_table(root: ET.ElementTree):
+def build_fsa_table(root: ET.ElementTree) -> pd.DataFrame:
     """
     Creates a table containing user IDs and home FSA location.
 
