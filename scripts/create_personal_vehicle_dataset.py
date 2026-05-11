@@ -1,3 +1,8 @@
+"""
+Used to filter only personal vehicles from SAAQ data and save it to
+separate file to minimize data size.
+"""
+
 import pandas as pd
 import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.config import DATA_DIR
@@ -39,5 +44,9 @@ for i in range(13, 21):
     df = df.loc[df["Usage"] == "Personnel"]
     # df = df.loc[df["RTA"].isin(PC_QC)]
     df.drop(columns=columns_to_drop, inplace=True)
-    df.to_csv(output_path / f"Personal_McGill_SAAQ_20{i}_2024-01-10.csv", index=False, decimal=".")
+    df.to_csv(
+        output_path / f"Personal_McGill_SAAQ_20{i}_2024-01-10.csv",
+        index=False,
+        decimal=".",
+    )
     print(f"{filename} saved.")

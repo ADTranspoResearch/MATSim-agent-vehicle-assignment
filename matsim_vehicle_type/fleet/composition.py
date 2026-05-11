@@ -23,6 +23,8 @@ def softmax(scores: dict[str, float]) -> dict[str, float]:
     dict[str, float]
         normalized scores relative to eachother. Values range from 0-1
         and all values sum up to 1.
+
+    Should be deprecated.
     """
     if len(scores) < 1:
         raise ValueError("Softmax scores cannot be empty.")
@@ -34,13 +36,38 @@ def softmax(scores: dict[str, float]) -> dict[str, float]:
         sf_dict[key] = (e**value) / exp_sum
     return sf_dict
 
-def multiply_reweight(previous_proportions: dict[str,float], growth_weight: dict[str,float]) -> dict[str:float]:
+
+def multiply_reweight(
+    previous_proportions: dict[str, float], growth_weight: dict[str, float]
+) -> dict[str:float]:
+    """
+    Takes a weighted average of the values in the "previous_proportions"
+    multiplied by their corresponding "growth_weight" values.
+
+    Parameters
+    ----------
+    previous_proportions : dict[str:float]
+        Previously used proportion of each vehicle type in the
+        composition.
+
+    growth_weight : dict[str:float]
+        Value determines how much each proportion will grow in the next
+        iteration. Higher growth rates lead to larger proportion taken
+        up by that vehicle type.
+    Returns
+    -------
+    dict[str:float]
+        New proportions to be used by the new vehicle composition.
+    """
+
     weight_dict = {}
     mult_sum = 0
     for vehicle_type, weight in growth_weight.items():
-        mult_sum += weight*previous_proportions[vehicle_type]
+        mult_sum += weight * previous_proportions[vehicle_type]
     for vehicle_type, weight in growth_weight.items():
-        weight_dict[vehicle_type] = weight*previous_proportions[vehicle_type] / mult_sum
+        weight_dict[vehicle_type] = (
+            weight * previous_proportions[vehicle_type] / mult_sum
+        )
     return weight_dict
 
 
@@ -48,6 +75,16 @@ def historic_fleet_composition(df: pd.DataFrame) -> pd.DataFrame:
     """
     Takes the historic SAAQ data and returns the counts of the different
     vehicle types.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Full historic SAAQ database.
+
+    Returns
+    -------
+    pd.DataFrame
+        Total counts of each vehicle type in the database for each year.
     """
 
     df["vehicle_type"] = df.apply(get_vehicle_type, axis=1)
@@ -66,7 +103,19 @@ def get_growth_trends(composition: list[pd.DataFrame]) -> pd.DataFrame:
     Takes a list of dfs that contain the total number of vehicles
     belonging to each vehicle type and returns the yearly growth rate
     for each vehicle type.
+
+    Parameters
+    ----------
+    composition : list[pd.DataFrame]
+        All historic vehicle count data available.
+
+    Returns
+    -------
+    pd.DataFrame
+        Rows are vehicle types and each year is a column with the growth
+        rate for that corresponding vehicle type.
     """
+
     full_df = pd.concat(composition, ignore_index=True)
     vehicle_types = full_df["vehicle_type"].unique()
 
@@ -85,11 +134,15 @@ def get_growth_trends(composition: list[pd.DataFrame]) -> pd.DataFrame:
     print(growth_trends)
     return avg_growth_trends
 
-def log_growth(initial:float, alpha:float, time: int) -> float:
+
+def log_growth(initial: float, alpha: float, time: int) -> float:
     """
     Returns the growth of a population based on a log growth rate.
+
+    Should be deprecated.
     """
     return initial + time * log10(1 + alpha)
+
 
 def predict_composition_trend(
     initial_composition: dict[float],
