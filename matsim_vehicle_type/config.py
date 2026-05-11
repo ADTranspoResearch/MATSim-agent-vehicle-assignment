@@ -1,5 +1,6 @@
 
 from pathlib import Path
+import csv
 ROOT = Path(__file__).resolve().parents[1]
 
 # Modify these variables to alter how the module functions.
@@ -31,3 +32,9 @@ VEH_FILE = VEH_DIR / VEH_NAME
 
 
 OUTPUT_DIR = ROOT / "output"
+
+
+with open(DATA_DIR / "FSA" / "fsa_codes_of_interest.csv", newline="") as f:
+    reader = csv.reader(f)
+    PC_QC_list = [row[0] for row in reader]
+    PC_QC = set(PC_QC_list)

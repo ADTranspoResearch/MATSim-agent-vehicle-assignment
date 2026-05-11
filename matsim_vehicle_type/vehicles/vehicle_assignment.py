@@ -3,10 +3,12 @@ Collection of functions that return the vehicle to be assigned to the
 input agent and agent demographics.
 """
 
+import unicodedata
 import random
 import pandas as pd
 
 from matsim_vehicle_type.config import DATA_DIR
+
 pivot_veh_dist = None
 
 
@@ -84,3 +86,63 @@ def get_veh_from_fsa(fsa):
     vehicle = random.choices(vehicles, weights=ownership_rates, k=1)[0]
 
     return vehicle
+
+
+def normalize(text):
+    """Helper function for get_vehicle_type."""
+    text = unicodedata.normalize("NFKD", str(text))
+    text = text.encode("ascii", "ignore").decode("utf-8")
+    return text.lower().strip()
+
+
+def get_vehicle_type(row):
+    """
+    Given a row from the SAAQ dataset, return the vehicle type from the
+    row.
+    """
+    h_type = normalize(row.get("Hybrid Type", ""))
+    motor = normalize(row.get("Motorisation", ""))
+    c_main = normalize(row.get("Classe principale", ""))
+
+    is_sedan = any(
+        x in c_main
+        for x in [
+            "compacte",
+            "sous-compacte",
+            "intermediaire",
+            "minicompacte",
+            "grande berline",
+            "deux places",
+        ]
+    )
+    is_suv = any(x in c_main for x in ["familiale", "fourgonnette", "vus"])
+    is_pickup_van = any(
+        x in c_main for x in ["camionnette", "vehicule a usage special", "fourgon"]
+    )
+
+    if h_type == "" and motor == "":
+        return "unknown"
+    if motor == "electrique":
+        return "electric"
+
+    is_hybrid = (motor in ["hybride", "hybride branchable"]) or (
+        motor == "" and h_type != ""
+    )
+    is_icev = motor in ["diesel", "essence", "gaz naturel"]
+
+    if is_hybrid:
+        if is_suv:
+            return "hev_suv"
+        if is_sedan:
+            return "hev_sedan"
+        if is_pickup_van:
+            return "hev_van/pickup"
+    elif is_icev:
+        if is_pickup_van:
+            return "ice_van/pickup"
+        if is_suv:
+            return "ice_suv"
+        if is_sedan:
+            return "ice_sedan"
+
+    return "other"
