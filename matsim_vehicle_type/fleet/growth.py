@@ -84,3 +84,76 @@ def read_historic_population(filename: str) -> pd.DataFrame:
     df = pd.read_csv(pop_file, index_col="year", thousands=",")
     df = df.loc[df["quarter"] == 1]
     return df
+
+
+def predict_fleet_over_time(
+    historic_fleet: pd.DataFrame,
+    historic_population: pd.DataFrame,
+    predicted_composition: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Takes historic fleet, predicted growth, new vehicle composition, and
+    simulates the changes to the fleet for the total number of years
+    that have a projected population.
+
+    Returns a dataframe that contains the total number of vehicles of
+    each vehicle type for every year that is predicted
+
+    Parameters
+    ----------
+    historic_fleet : pd.DataFrame
+        Latest historical data containing the total number of vehicles
+        of each type in the fleet.
+    historic_population : pd.DataFrame
+        Provides the growth patters of the fleet. Columns should contain
+        fleet growth, number of new vehicles entering fleet, and number
+        of vehicles exiting fleet. Must have rows for the lastest year
+        in the composition dataframe.
+    predicted_composition : pd.DataFrame
+        Provides the predicted vehicle type composition of the new
+        vehicles entering the fleet for each year. Rows are the vehicle
+        types and columns are the predicted years. Function will
+        simulate fleet dynamics up until the last year provided by
+        this dataframe.
+
+    Returns
+    -------
+    pd.DataFrame
+        Provides the number of vehicles of each vehicle type (row) for
+        every simulated year (column), also saves it to a file.
+    """
+    # Predict fleet change over time
+
+    base_counts = historic_fleet.set_index("vehicle_type")["count"]
+
+    # Create output dataframe
+    result_df = pd.DataFrame(index=base_counts.index)
+
+    # Store initial year (2020)
+    result_df[2020] = base_counts
+
+    # Ensure prediction years are sorted numerically
+    prediction_years = sorted(predicted_composition.columns)
+
+    for year in prediction_years:
+
+        previous_year = year - 1
+
+        # Total fleet growth for this year
+        growth = historic_population.loc[year, "fleet_growth"]
+
+        # Previous year's fleet totals
+        previous_totals = result_df[previous_year]
+
+        # Composition ratios for NEW vehicles entering the fleet
+        composition_ratios = predicted_composition[year]
+
+        # Number of new vehicles added for each type
+        additions = growth * composition_ratios
+
+        # New fleet totals
+        result_df[year] = previous_totals + additions
+
+    result_df.to_csv("predicted_fleet_composition.csv")
+    print(result_df)
+    return result_df
