@@ -87,7 +87,6 @@ def historic_fleet_composition(df: pd.DataFrame) -> pd.DataFrame:
         Total counts of each vehicle type in the database for each year.
     """
 
-    df["vehicle_type"] = df.apply(get_vehicle_type, axis=1)
     df = df[~df["vehicle_type"].isin(["unknown", "other", "hev_van/pickup"])]
     historic_veh_type = (
         df.groupby(["AnneeSAAQ", "vehicle_type"])

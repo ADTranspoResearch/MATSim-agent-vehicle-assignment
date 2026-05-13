@@ -135,12 +135,13 @@ def predict_fleet_over_time(
     # Ensure prediction years are sorted numerically
     prediction_years = sorted(predicted_composition.columns)
 
+    exiting_proportions = result_df[2020] / result_df[2020].sum()
     for year in prediction_years:
 
         previous_year = year - 1
 
         # Total fleet growth for this year
-        growth = historic_population.loc[year, "fleet_growth"]
+        growth = historic_population.loc[year, "new"]
 
         # Previous year's fleet totals
         previous_totals = result_df[previous_year]
@@ -151,8 +152,15 @@ def predict_fleet_over_time(
         # Number of new vehicles added for each type
         additions = growth * composition_ratios
 
+        # Number of removed vehicles from each type
+        total_exit = historic_population.loc[year, "implied_exit"]
+        if total_exit >= 0:
+            exiting = exiting_proportions * total_exit
+        else:
+            exiting = exiting_proportions * 0
+
         # New fleet totals
-        result_df[year] = previous_totals + additions
+        result_df[year] = previous_totals + additions - exiting
 
     result_df.to_csv("predicted_fleet_composition.csv")
     print(result_df)

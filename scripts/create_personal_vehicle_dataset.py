@@ -6,6 +6,7 @@ separate file to minimize data size.
 import pandas as pd
 import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.config import DATA_DIR
+from matsim_vehicle_type.vehicles.vehicle_distribution import get_vehicle_type
 
 fleet_path = DATA_DIR / "vehicles" / "ownership"
 output_path = fleet_path / "personal_ownership"
@@ -43,6 +44,7 @@ for i in range(13, 21):
     df = pd.read_csv(filepath, sep=";", decimal=",", encoding="utf-16", dtype=dtype_map)
     df = df.loc[df["Usage"] == "Personnel"]
     # df = df.loc[df["RTA"].isin(PC_QC)]
+    df["vehicle_type"] = df.apply(get_vehicle_type, axis=1)
     df.drop(columns=columns_to_drop, inplace=True)
     df.to_csv(
         output_path / f"Personal_McGill_SAAQ_20{i}_2024-01-10.csv",
