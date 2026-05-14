@@ -21,7 +21,7 @@ from matsim_vehicle_type.config import (
     OUTPUT_DIR,
 )
 
-def assign_matsim_users_vehicle_type():
+def assign_matsim_users_vehicle_type(scenario_year=SCN_YEAR, scenario_type="historical"):
     random.seed(SEED)
 
     with gzip.open(POP_FILE, "rt", encoding="utf-8") as f:
@@ -29,7 +29,7 @@ def assign_matsim_users_vehicle_type():
     root = tree.getroot()
 
     # Initialize the FSA table, if not constructed will be constructed now.
-    load_veh_dist(SCN_YEAR)
+    load_veh_dist(scenario_year, scenario_type)
     fsa_table = get_fsa_table(root)
 
     # Iterate over every agent in population, get home coordinates, get

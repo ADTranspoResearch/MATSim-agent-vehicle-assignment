@@ -12,7 +12,7 @@ from matsim_vehicle_type.config import DATA_DIR
 pivot_veh_dist = None
 
 
-def load_veh_dist(year: int):
+def load_veh_dist(year: int, scenario_type):
     """
     Preloads the appropriate vehicle distribution for get_prob_from_demos.
 
@@ -30,7 +30,11 @@ def load_veh_dist(year: int):
 
     global pivot_veh_dist  # pylint: disable=global-statement
 
-    vehicle_dist_path = DATA_DIR / "vehicles" / f"fsa_vehicle_share_{year}"
+    if scenario_type == "predicted":
+        vehicle_dist_path = DATA_DIR / "vehicles" / "predicted_share" / f"fsa_vehicle_share_{year}"
+    else:
+        vehicle_dist_path = DATA_DIR / "vehicles" / f"fsa_vehicle_share_{year}"
+
     parquet_path = vehicle_dist_path.with_suffix(".parquet")
     csv_path = vehicle_dist_path.with_suffix(".csv")
     if parquet_path.exists():
@@ -53,7 +57,10 @@ def get_prob_from_demo(fsa: str) -> tuple[tuple[str], tuple[float]]:
     """
 
     try:
-        row = pivot_veh_dist.loc[(fsa)]
+        if fsa in pivot_veh_dist.index:
+            row = pivot_veh_dist.loc[(fsa)]
+        else:
+            row = pivot_veh_dist.iloc[0]
         active_vehicles = row[row > 0]
         if active_vehicles.empty:
             raise KeyError(

@@ -12,13 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 # Modify these variables to alter how the module functions.
 SEED = 2
 # Scenario Data.
-SCN_YEAR = 2035
+SCN_YEAR = 2040
 # Possible case options =
 # REF : Reference scenario (only when using historical vehicle data)
 # BAU : buisness as usual,
 # EVAS : Electric vehicle availability standard,
 # C : Carney scenario
-SCN_CASE = "BAU"
+SCN_CASE = "pred"
 
 
 POP_NAME = "quebec_population.xml.gz"

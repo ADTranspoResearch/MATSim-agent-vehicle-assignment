@@ -135,7 +135,7 @@ def predict_fleet_over_time(
     # Ensure prediction years are sorted numerically
     prediction_years = sorted(predicted_composition.columns)
 
-    exiting_proportions = result_df[2020] / result_df[2020].sum()
+    exit_proportions = result_df[2020] / result_df[2020].sum()
     for year in prediction_years:
 
         previous_year = year - 1
@@ -155,12 +155,24 @@ def predict_fleet_over_time(
         # Number of removed vehicles from each type
         total_exit = historic_population.loc[year, "implied_exit"]
         if total_exit >= 0:
-            exiting = exiting_proportions * total_exit
+            exiting_vehicles = exit_proportions * total_exit
         else:
-            exiting = exiting_proportions * 0
+            exiting_vehicles = exit_proportions * 0
 
         # New fleet totals
-        result_df[year] = previous_totals + additions - exiting
+        result_df[year] = previous_totals + additions - exiting_vehicles
+
+
+    # Save compositions for use in vehicle assignment
+    percentages = result_df.div(result_df.sum(axis=0), axis=1)
+    for year in percentages.columns:
+        output_df = pd.DataFrame(
+            [percentages[year].values],
+            index=["H0H"],
+            columns=percentages.index
+        )
+        output_path = DATA_DIR / "vehicles" / "predicted_share"
+        output_df.to_csv(output_path / f"fsa_vehicle_share_{year}.csv", index_label="fsa")
 
     result_df.to_csv("predicted_fleet_composition.csv")
     print(result_df)
