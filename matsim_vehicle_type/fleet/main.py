@@ -10,11 +10,11 @@ from matsim_vehicle_type.fleet.growth import (
     read_historic_population,
 )
 
-def main():
+def main(fsa_codes): 
     # Find alpha (veh_per_person) and beta (new_veh_per_person)
-    fleet_size = get_historic_fleet_size()
+    fleet_size = get_historic_fleet_size(fsa_codes)
+    pop_filname = f"fsa_projected_pop/{fsa_codes}_projected_pop.csv"  
 
-    pop_filname = "quebec_projected_pop.csv"
     historic_pop = read_historic_population(pop_filname)
     historic_pop = historic_pop.merge(
         fleet_size, how="left", left_index=True, right_on="year"
@@ -39,4 +39,5 @@ def main():
         historic_pop.loc[mask, "persons"] * new_per_pers
     ).round()
     historic_pop["implied_exit"] = historic_pop["new"] - historic_pop["fleet_growth"]
+    # print(historic_pop)
     return historic_pop

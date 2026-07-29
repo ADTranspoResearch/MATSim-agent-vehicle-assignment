@@ -5,7 +5,8 @@ fleet size.
 
 import csv
 import pandas as pd
-from matsim_vehicle_type.config import DATA_DIR
+import numpy as np  
+from matsim_vehicle_type.config import DATA_DIR, DTYPE_MAP, PC_QC, PC_QCP, SCN_CASE, SCN_CONFIGS
 
 
 def calculate_vehicle_per_person(pop: int, fleet_size: int) -> float:
@@ -13,7 +14,7 @@ def calculate_vehicle_per_person(pop: int, fleet_size: int) -> float:
     return veh_per_pers
 
 
-def get_historic_fleet_size() -> pd.DataFrame:
+def get_historic_fleet_size(fsa_code:str) -> pd.DataFrame:
     """
     Reads each yearly personal vehicle SAAQ data fuke and returns a df
     containing every row for each year.
@@ -26,17 +27,7 @@ def get_historic_fleet_size() -> pd.DataFrame:
     """
 
     fleet_path = DATA_DIR / "vehicles" / "ownership" / "personal_ownership"
-    fleet_size_path = fleet_path / "historic_fleet_size.csv"
-
-    dtype_map = {
-        "MOD": "string",
-        "CYL2": "string",
-        "CARB": "string",
-        "Motorisation": "string",
-        "Genre": "string",
-        "Hybrid Type": "string",
-        "Propulsion": "string",
-    }
+    fleet_size_path = fleet_path / f"{fsa_code}_historic_fleet_size.csv"
     if fleet_size_path.exists():
 
         df = pd.read_csv(
@@ -48,8 +39,15 @@ def get_historic_fleet_size() -> pd.DataFrame:
             filename = f"Personal_McGill_SAAQ_{i}_2024-01-10.csv"
             filepath = fleet_path / filename
             print(f"running {filename}.")
+            df_year = pd.read_csv(filepath, dtype=DTYPE_MAP)
 
-            df_year = pd.read_csv(filepath, dtype=dtype_map)
+            if fsa_code == "H0H":
+                df_year = df_year.loc[df_year['RTA'].isin(PC_QCP)].copy()
+            elif fsa_code == "Q0Q":
+                df_year = df_year.loc[df_year['RTA'].isin(PC_QC)].copy()
+            else:  
+                df_year = df_year.loc[df_year['RTA'] == fsa_code].copy()
+
             rows.append(
                 {
                     "year": i,
@@ -60,6 +58,7 @@ def get_historic_fleet_size() -> pd.DataFrame:
             )
         df = pd.DataFrame(rows)
         df.to_csv(fleet_size_path, index=False)
+        # print(df)
 
     return df
 
@@ -82,7 +81,6 @@ def read_historic_population(filename: str) -> pd.DataFrame:
     """
     pop_file = DATA_DIR / "population" / filename
     df = pd.read_csv(pop_file, index_col="year", thousands=",")
-    df = df.loc[df["quarter"] == 1]
     return df
 
 
@@ -90,6 +88,7 @@ def predict_fleet_over_time(
     historic_fleet: pd.DataFrame,
     historic_population: pd.DataFrame,
     predicted_composition: pd.DataFrame,
+    fsa_code: str
 ) -> pd.DataFrame:
     """
     Takes historic fleet, predicted growth, new vehicle composition, and
@@ -123,28 +122,49 @@ def predict_fleet_over_time(
         every simulated year (column), also saves it to a file.
     """
     # Predict fleet change over time
-
-    base_counts = historic_fleet.set_index("vehicle_type")["count"]
-
-    # Create output dataframe
-    result_df = pd.DataFrame(index=base_counts.index)
-
-    # Store initial year (2020)
-    result_df[2020] = base_counts
+    combined_fleet = pd.concat(historic_fleet, ignore_index=True)
+    df_result = combined_fleet.pivot(
+        index="vehicle_type", columns="AnneeSAAQ", values="count"
+    )
+    df_result = df_result.fillna(0).astype(int)  
+    print(df_result[2019])
 
     # Ensure prediction years are sorted numerically
     prediction_years = sorted(predicted_composition.columns)
+    available_years = sorted(df_result.columns)
 
-    exit_proportions = result_df[2020] / result_df[2020].sum()
+
     for year in prediction_years:
 
+        start_year = year - 10
         previous_year = year - 1
+
+        years = list(range(start_year, previous_year + 1))
+        used_years = [
+            y if y in available_years else available_years[0]
+            for y in years
+        ]
+
+        weights = np.arange(
+            len(years),
+            0,
+            -1
+        )
+
+        weighted_fleet = df_result[used_years].mul(
+            weights,
+            axis=1
+        )
+        avg_fleet = weighted_fleet.sum(axis=1) / weights.sum()
+
+        exit_proportions = avg_fleet / avg_fleet.sum()
+
 
         # Total fleet growth for this year
         growth = historic_population.loc[year, "new"]
 
         # Previous year's fleet totals
-        previous_totals = result_df[previous_year]
+        previous_totals = df_result[previous_year]
 
         # Composition ratios for NEW vehicles entering the fleet
         composition_ratios = predicted_composition[year]
@@ -153,27 +173,68 @@ def predict_fleet_over_time(
         additions = growth * composition_ratios
 
         # Number of removed vehicles from each type
-        total_exit = historic_population.loc[year, "implied_exit"]
+        total_exit = historic_population.loc[year, "implied_exit"]   
         if total_exit >= 0:
-            exiting_vehicles = exit_proportions * total_exit
+
+            remaining_exit = total_exit
+            exiting_vehicles = pd.Series(
+                0,
+                index=previous_totals.index,
+                dtype=float
+            )
+
+            available_types = previous_totals.index.tolist()
+
+            while remaining_exit > 1e-8 and len(available_types) > 0:
+
+                # Exit allocation based on original proportions
+                weights = exit_proportions[available_types]
+
+                weights = weights / weights.sum()
+
+                proposed_exit = remaining_exit * weights
+
+                # Cannot remove more vehicles than available
+                actual_exit = pd.DataFrame({
+                    "proposed": proposed_exit,
+                    "available": previous_totals[available_types] - exiting_vehicles[available_types]
+                }).min(axis=1)
+
+                # Add this round of exits
+                exiting_vehicles[available_types] += actual_exit
+
+                # Remaining exits
+                remaining_exit -= actual_exit.sum()
+
+                # Remove vehicle types that have no vehicles left
+                available_types = [
+                    t for t in available_types
+                    if previous_totals[t] - exiting_vehicles[t] > 1e-8
+                ]
+
         else:
-            exiting_vehicles = exit_proportions * 0
+            exiting_vehicles = pd.Series(
+                0,
+                index=previous_totals.index
+            )
 
         # New fleet totals
-        result_df[year] = previous_totals + additions - exiting_vehicles
+        new_totals = previous_totals + additions - exiting_vehicles
+
+        df_result[year] = new_totals
 
 
-    # Save compositions for use in vehicle assignment
-    percentages = result_df.div(result_df.sum(axis=0), axis=1)
+    percentages = df_result.div(df_result.sum(axis=0), axis=1)
     for year in percentages.columns:
         output_df = pd.DataFrame(
             [percentages[year].values],
-            index=["H0H"],
+            index=[fsa_code],
             columns=percentages.index
         )
-        output_path = DATA_DIR / "vehicles" / "predicted_share"
-        output_df.to_csv(output_path / f"fsa_vehicle_share_{year}.csv", index_label="fsa")
+        output_path = DATA_DIR / "vehicles" / "predicted_share"/ f"fsa_vehicle_share_{year}_{SCN_CASE}.csv"
+        if output_path.exists():
+            output_df.to_csv(output_path, mode='a', header=False)
+        else:
+            output_df.to_csv(output_path, index_label="fsa")
 
-    result_df.to_csv("predicted_fleet_composition.csv")
-    print(result_df)
-    return result_df
+    return df_result

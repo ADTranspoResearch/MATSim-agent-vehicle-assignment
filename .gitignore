@@ -1,6 +1,14 @@
-# Ignore vehicle ownership files, data should be stored locally.
-# see sample_ownership.csv for ownership data format.
-data/vehicles/ownership/*
+# macOS local metadata
+.DS_Store
+
+# Keep local MATSim and vehicle data directories, but do not upload data files.
+data/MATSim/**
+!data/MATSim/**/
+!data/MATSim/**/.gitkeep
+
+data/vehicles/**
+!data/vehicles/**/
+!data/vehicles/**/.gitkeep
 
 # Hiding random sample generation code.
 random_sample.py

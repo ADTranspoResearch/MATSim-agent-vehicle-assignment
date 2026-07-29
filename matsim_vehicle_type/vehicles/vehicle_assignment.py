@@ -7,7 +7,7 @@ import unicodedata
 import random
 import pandas as pd
 
-from matsim_vehicle_type.config import DATA_DIR
+from matsim_vehicle_type.config import DATA_DIR, SCN_CASE
 
 pivot_veh_dist = None
 
@@ -31,7 +31,7 @@ def load_veh_dist(year: int, scenario_type):
     global pivot_veh_dist  # pylint: disable=global-statement
 
     if scenario_type == "predicted":
-        vehicle_dist_path = DATA_DIR / "vehicles" / "predicted_share" / f"fsa_vehicle_share_{year}"
+        vehicle_dist_path = DATA_DIR / "vehicles" / "predicted_share" / f"fsa_vehicle_share_{year}_{SCN_CASE}"
     else:
         vehicle_dist_path = DATA_DIR / "vehicles" / f"fsa_vehicle_share_{year}"
 
