@@ -1,11 +1,11 @@
 # MATSim-agent-vehicle-assignment
 
 Code for projecting neighborhood-level vehicle fleets and assigning
-vehicle types to MATSim agents, used in the study *"Spatially targeted
-electric vehicle adoption: Linking neighborhood fleets, emissions, and
-electricity demand"* (Quebec City case study, prepared for submission to
-*Transportation Research Part D: Transport and Environment*; an earlier
-version was prepared for the TRB Annual Meeting).
+vehicle types to MATSim agents, used in the study *"Where EV adoption
+and transport emissions diverge: Neighborhood-level assessment of
+Quebec City"* (prepared for submission to *Transportation Research
+Part D: Transport and Environment*; an earlier version was submitted
+to the TRB Annual Meeting).
 
 The pipeline models vehicle stocks and technology shares at the Forward
 Sortation Area (FSA) level from SAAQ registration and census population
