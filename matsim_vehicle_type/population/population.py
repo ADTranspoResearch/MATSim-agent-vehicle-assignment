@@ -34,7 +34,7 @@ def get_demos(person: ET.Element) -> tuple[str, int]:
     except KeyError as e:
         raise (
             KeyError(
-                f"Agent {person.find("./attributes/attribute[@name='sex']")} does not gender and/or age."
+                "Agent does not gender and/or age."
             )
         ) from e
 

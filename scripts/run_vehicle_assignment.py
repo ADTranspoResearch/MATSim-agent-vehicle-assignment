@@ -7,4 +7,4 @@ import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.main import assign_matsim_users_vehicle_type
 
 if __name__ == "__main__":
-    assign_matsim_users_vehicle_type()
+    assign_matsim_users_vehicle_type(scenario_year=2035, scenario_type="predicted")

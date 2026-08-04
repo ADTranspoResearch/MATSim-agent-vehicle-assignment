@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata below.
+  Please cite the associated journal article once it is published.
+title: MATSim-agent-vehicle-assignment
+type: software
+repository-code: https://github.com/ADTranspoResearch/MATSim-agent-vehicle-assignment
+license: GPL-3.0
+authors:
+  - family-names: Chen
+    given-names: Qi
+    affiliation: McGill University
+  - family-names: Manzolli
+    given-names: Jônatas Augusto
+    affiliation: McGill University; INESC Coimbra
+    orcid: https://orcid.org/0000-0003-1043-6417
+  - family-names: D'Apice
+    given-names: Alessandro Vissarios
+    affiliation: McGill University
+  - family-names: Pandey
+    given-names: Praveen Kumar
+    affiliation: Polytechnique Montréal
+preferred-citation:
+  type: article
+  title: >-
+    Where EV adoption and transport emissions diverge: Neighborhood-level
+    assessment of Quebec City
+  status: in-preparation
+  journal: "Transportation Research Part D: Transport and Environment"
+  authors:
+    - family-names: Chen
+      given-names: Qi
+    - family-names: Manzolli
+      given-names: Jônatas Augusto
+    - family-names: D'Apice
+      given-names: Alessandro Vissarios
+    - family-names: Jiao
+      given-names: Yubo
+    - family-names: Pandey
+      given-names: Praveen Kumar
+    - family-names: Ciari
+      given-names: Francesco
+    - family-names: Miranda-Moreno
+      given-names: Luis
