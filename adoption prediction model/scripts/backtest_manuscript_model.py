@@ -21,6 +21,12 @@ Truth data: observed province-wide new-vehicle sales shares 2021-2025 built
 from the Statistics Canada new-motor-vehicle registrations benchmark
 (validation_outputs/model_validation_2025/observed_sales_share_2017_2025.csv).
 
+NOTE on 2025: the source spreadsheet contains only 2025 Q1, and the benchmark
+CSV reports "2025" as the trailing four-quarter share ending 2025 Q1 (10.34%),
+not a calendar-2025 value (raw 2025 Q1 alone is 6.18%, after the provincial
+incentive pause). Error summaries are therefore reported both for the full
+calendar years 2021-2024 and including the trailing-year 2025 point.
+
 Outputs (validation_outputs/manuscript_bau_backtest/):
   predicted_vs_observed_2021_2025.csv
   backtest_error_summary.csv
@@ -172,16 +178,21 @@ def main() -> None:
             "max_abs_error": err.abs().max(),
         }
     )
+    err4 = err.loc[[y for y in FORECAST_YEARS if y <= 2024]]
     overall = pd.DataFrame(
         {
-            "mae": [err.abs().values.mean()],
-            "rmse": [np.sqrt((err.values**2).mean())],
-            "mean_error": [err.values.mean()],
-            "max_abs_error": [np.abs(err.values).max()],
+            "mae": [err.abs().values.mean(), err4.abs().values.mean()],
+            "rmse": [np.sqrt((err.values**2).mean()), np.sqrt((err4.values**2).mean())],
+            "mean_error": [err.values.mean(), err4.values.mean()],
+            "max_abs_error": [np.abs(err.values).max(), np.abs(err4.values).max()],
         },
-        index=["overall"],
+        index=["overall_2021_2025_trailing", "overall_2021_2024_full_years"],
     )
     ev_row = summary.loc[["electric"]]
+    ev4 = err4["electric"]
+    overall.loc["electric_2021_2024_full_years"] = [
+        ev4.abs().mean(), np.sqrt((ev4**2).mean()), ev4.mean(), ev4.abs().max()
+    ]
     pd.concat([overall, summary]).to_csv(OUTPUT_DIR / "backtest_error_summary.csv")
 
     fig, ax = plt.subplots(figsize=(6.2, 4.0))
@@ -215,8 +226,12 @@ def main() -> None:
     print("\nEV share, predicted vs observed (%):")
     for year in FORECAST_YEARS:
         print(f"  {year}: pred={100*pred.loc[year,'electric']:.2f}  obs={100*obs.loc[year,'electric']:.2f}")
-    print("\nOverall MAE=%.4f  EV MAE=%.4f  EV mean error=%.4f"
-          % (overall.loc['overall','mae'], ev_row.loc['electric','mae'], ev_row.loc['electric','mean_error']))
+    print("\n2021-2024 full years: overall MAE=%.4f  EV MAE=%.4f"
+          % (overall.loc['overall_2021_2024_full_years', 'mae'],
+             overall.loc['electric_2021_2024_full_years', 'mae']))
+    print("2021-2025 incl. trailing-year point: overall MAE=%.4f  EV MAE=%.4f  EV mean error=%.4f"
+          % (overall.loc['overall_2021_2025_trailing', 'mae'],
+             ev_row.loc['electric', 'mae'], ev_row.loc['electric', 'mean_error']))
     print("wrote", OUTPUT_DIR)
 
 
