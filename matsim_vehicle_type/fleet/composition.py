@@ -421,31 +421,22 @@ def refit_ev_with_gompertz(
 
     return df
 
-def _ev_logit_with_ceiling(y: float, ceiling: float) -> float:
-    y = _clip_share(y)
-    ceiling = float(ceiling)
-
-    if y >= ceiling:
-        raise ValueError(f"EV share {y} must be below ceiling {ceiling}.")
-
-    return log(y / (ceiling - y))
-
-
-def apply_ev_logit_scenario_from_scaled_target(
+def apply_ev_gompertz_scenario_from_scaled_target(
     df: pd.DataFrame,
     ev_type: str = "electric",
     anchor_year: int = 2024,
     target_year: int = 2035,
     target_factor: float = 1.25,
+    lower: float = 0.0,
     ceiling: float = 1.0,
     min_target_delta: float = 1e-9,
 ) -> pd.DataFrame:
     """
     Keep years <= anchor_year unchanged.
 
-    For later years, refit EV share with:
+    For later years, refit EV share with a Gompertz curve:
 
-        y(t) = K / (1 + exp[-r * (t - t0)])
+        y(t) = L + (U - L) * exp[-a * exp(-k * t)]
 
     using:
         anchor_year EV share from baseline
@@ -483,17 +474,24 @@ def apply_ev_logit_scenario_from_scaled_target(
         )
         y_target = adjusted_target
 
-    z_anchor = _ev_logit_with_ceiling(y_anchor, ceiling)
-    z_target = _ev_logit_with_ceiling(y_target, ceiling)
-
-    r = (z_target - z_anchor) / (target_year - anchor_year)
-    t0 = anchor_year - z_anchor / r
+    anchor_points = {
+        anchor_year: y_anchor,
+        target_year: y_target,
+    }
+    lower, upper, a, k, base_year = _fit_ev_gompertz_fixed_bounds(
+        anchor_points,
+        lower=lower,
+        upper=ceiling,
+        fit_years=(anchor_year, target_year),
+        base_year=anchor_year,
+    )
 
     for year in scenario_df.columns:
         if year <= anchor_year:
             continue
 
-        ev_target = ceiling / (1 + exp(-r * (year - t0)))
+        t = year - base_year
+        ev_target = lower + (upper - lower) * exp(-a * exp(-k * t))
         ev_target = _clip_share(ev_target)
 
         ev_old = _clip_share(df.loc[ev_type, year])
@@ -512,6 +510,16 @@ def apply_ev_logit_scenario_from_scaled_target(
                 scenario_df.loc[vehicle_type, year] = df.loc[vehicle_type, year] * scale
 
     return scenario_df
+
+
+def apply_ev_logit_scenario_from_scaled_target(*args, **kwargs) -> pd.DataFrame:
+    """
+    Backward-compatible alias for the Gompertz scaled-target scenario.
+
+    The old implementation used a logistic curve. Scenario configs that still
+    refer to "ev_logit_scaled_target" now use the Gompertz model.
+    """
+    return apply_ev_gompertz_scenario_from_scaled_target(*args, **kwargs)
 
 def predict_composition_trend(
     initial_composition: dict[float],
@@ -557,13 +565,14 @@ def predict_composition_trend(
         if cfg["type"] != "none":
             for year in df.columns:
                 electric_old = df.loc["electric", year]
-                if cfg["type"] == "ev_logit_scaled_target":
-                    df = apply_ev_logit_scenario_from_scaled_target(
+                if cfg["type"] in {"ev_gompertz_scaled_target", "ev_logit_scaled_target"}:
+                    df = apply_ev_gompertz_scenario_from_scaled_target(
                         df,
                         ev_type="electric",
                         anchor_year=cfg.get("anchor_year", 2024),
                         target_year=cfg.get("target_year", 2035),
                         target_factor=cfg.get("factor", 1.25),
+                        lower=cfg.get("lower", 0.0),
                         ceiling=cfg.get("ceiling", 1.0),
                         min_target_delta=cfg.get("min_target_delta", 1e-9),
                     )

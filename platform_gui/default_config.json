@@ -1,0 +1,19 @@
+{
+  "population_file": "data/MATSim/population/population.xml.gz",
+  "vehicle_file": "data/MATSim/vehicles/output_vehicles.xml.gz",
+  "transit_vehicle_file": "data/MATSim/vehicles/transit_vehicles.xml",
+  "matsim_events_file": "data/MATSim/events/output_events.xml.gz",
+  "emission_events_file": "data/MATSim/emission_events/emission.events.offline.2035.BAU.xml.gz",
+  "emission_events_dir": "data/MATSim/emission_events",
+  "emission_config_dir": "data/MATSim/emission_configs",
+  "emission_config_template": "matsim-emissions/QC_input_data/config/config_average.xml",
+  "emission_module_dir": "matsim-emissions",
+  "network_file": "data/MATSim/network/network_0409.xml",
+  "fsa_lookup_file": "data/FSA/agent_id_fsa_table.csv",
+  "fsa_shapefile": "data/FSA/quebec_fsa/quebec_fsa.shp",
+  "historical_vehicle_share_dir": "data/vehicles",
+  "predicted_vehicle_share_dir": "data/vehicles/predicted_share",
+  "historical_bev_share_file": "data_post-processing/results/battery_electric_vehicle_type_share_quebec.csv",
+  "output_dir": "output",
+  "results_dir": "data_post-processing/results"
+}

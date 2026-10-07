@@ -15,6 +15,43 @@ random_sample.py
 
 MATSim/**/*.xml
 
+# Local GUI settings saved from the platform.
+platform_gui/config.json
+
+# Local render/export artifacts.
+.codex_render_methodology/
+data_post-processing/results/
+output/*.xml
+
+# Local MATSim emissions checkout and scenario data.
+matsim-emissions/
+
+# Local/generated population exports.
+data/2310030801-eng.numbers
+data/population/fsa_projected_pop/
+data/population/population_counts_2021_byfsa.csv
+data/population/qcity_projected_pop.csv
+data/population/quebec_projected_pop_v2.csv
+qcity_projected_pop.csv
+
+# One-off local helper scripts tied to raw/private data locations.
+data/FSA/create_qcp_fsa.py
+data/population/test.py
+data/population/pop_data_processing.py
+data_post-processing/aaa.py
+
+# Sensitive source vehicle-registration exports. Keep SAAQ raw data local.
+**/*SAAQ*.csv
+**/*SAAQ*.tsv
+**/*SAAQ*.xlsx
+**/*SAAQ*.xls
+**/*SAAQ*.numbers
+**/*saaq*.csv
+**/*saaq*.tsv
+**/*saaq*.xlsx
+**/*saaq*.xls
+**/*saaq*.numbers
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

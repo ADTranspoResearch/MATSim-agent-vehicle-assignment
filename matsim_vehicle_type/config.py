@@ -18,7 +18,7 @@ SCN_YEAR = 2035
 # BAU : buisness as usual,
 # EVAS : Electric vehicle availability standard,
 # C : Carney scenario
-SCN_CASE = "ACCELERATED_ADOPTION"
+SCN_CASE = "DELAYED_ADOPTION"
 SCN_CONFIGS = {
     "BAU":{
         "type": "none",
@@ -51,7 +51,7 @@ SCN_CONFIGS = {
         "file_prefix": "target"
     },
     "ACCELERATED_ADOPTION": {
-        "type": "ev_logit_scaled_target",
+        "type": "ev_gompertz_scaled_target",
         "anchor_year": 2024,
         "target_year": 2035,
         "factor": 1.25,
@@ -59,7 +59,7 @@ SCN_CONFIGS = {
         "file_prefix": "ev2035_25higher",
     },
     "DELAYED_ADOPTION": {
-        "type": "ev_logit_scaled_target",
+        "type": "ev_gompertz_scaled_target",
         "anchor_year": 2024,
         "target_year": 2035,
         "factor": 0.75,
@@ -79,6 +79,7 @@ POP_DIR = DATA_DIR / "MATSim" / "population"
 VEH_DIR = DATA_DIR / "MATSim" / "vehicles"
 POP_FILE = POP_DIR / POP_NAME
 VEH_FILE = VEH_DIR / VEH_NAME
+TRANSIT_VEH_FILE = VEH_DIR / "transit_vehicles.xml"
 OUTPUT_DIR = ROOT / "output"
 
 DTYPE_MAP = {

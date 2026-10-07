@@ -1,0 +1,80 @@
+"""
+Based on FSA pop in 2021 and pop growth of quebec
+generate predicted pop by FSA(list of interests)
+one file for each fsa
+
+"""
+
+import pandas as pd
+import _setup_path  # pylint: disable=unused-import
+from matsim_vehicle_type.config import PC_QC, DATA_DIR, PC_QCP
+from matsim_vehicle_type.fleet.growth import read_historic_population
+
+input_filename = "population_counts_2021_byfsa.csv"
+input_filepath = DATA_DIR / "population" / input_filename
+output_dir = DATA_DIR / "population" / "fsa_projected_pop"
+
+df = (pd.read_csv(input_filepath)
+    .loc[
+            :,
+            [
+                "REF_DATE",
+                "GEO",
+                "Population and dwelling counts (3)",
+                "VALUE"
+            ],
+        ]
+)
+
+df_filtered = df[
+    (df["GEO"].isin(PC_QCP))
+    &
+    (df["Population and dwelling counts (3)"] == "Population, 2021")
+].copy()
+
+
+qc_pop_filename = "quebec_projected_pop_v2.csv"
+qc_df = read_historic_population(qc_pop_filename)
+
+qc_df = qc_df[["persons"]].copy()
+print(qc_df)
+years = list(range(2015, 2041))
+qcity_df = pd.DataFrame({"persons": 0}, index=years)
+qcity_df.index.name = "year"
+
+for fsa_code, group in df_filtered.groupby("GEO"):
+
+    fsa_df = pd.DataFrame()
+    fsa_df["year"] = group["REF_DATE"]
+    fsa_df["persons"] = group["VALUE"]
+    fsa_df.set_index("year", inplace=True)
+
+    for year in range(2022, 2051):
+        prev_year = year - 1
+        fsa_df.loc[year,'persons'] = round(
+            qc_df.loc[year,'persons']
+            * fsa_df.loc[prev_year,'persons']
+            / qc_df.loc[prev_year,'persons']
+        )
+
+
+    for year in range(2020, 2014, -1):
+        next_year = year + 1
+        fsa_df.loc[year,'persons'] = round(
+            qc_df.loc[year,'persons']
+            * fsa_df.loc[next_year,'persons']
+            / qc_df.loc[next_year,'persons']
+        )
+
+    qcity_df += fsa_df
+
+
+    fsa_df = fsa_df.sort_values("year")
+    file_name = f"{fsa_code}_projected_pop.csv"
+    file_path = output_dir / file_name
+
+    fsa_df.to_csv(file_path, index=True)
+
+qc_city_pop_filename = "qcity_projected_pop.csv"
+
+qcity_df.to_csv(DATA_DIR / "population" / qc_city_pop_filename, index=True)

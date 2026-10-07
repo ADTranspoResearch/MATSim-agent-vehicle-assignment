@@ -42,7 +42,7 @@ total_fleet = pd.DataFrame()
 # {"H0H"}: PC representing the whole province, used for province-level prediction
 # Q0Q: PC representing the whole city, used for city-level prediction
 
-for fsa_code in PC_QC:
+for fsa_code in {"H0H"}:
     print(f"-------------Prediction for {fsa_code} starts-------------")
     historic_pop = main(fsa_code)
 
@@ -72,6 +72,12 @@ for fsa_code in PC_QC:
                 if fsa in fleet_by_fsa_year
             ]
             df_year = pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
+            df_entrant_list = [
+                entrant_by_fsa_year[fsa].get(i)
+                for fsa in PC_QC
+                if fsa in entrant_by_fsa_year
+            ]
+            df_entrant_year = pd.concat(df_entrant_list, ignore_index=True) if df_entrant_list else pd.DataFrame()
         else:
             df_year = fleet_by_fsa_year[fsa_code].get(i)
             df_entrant_year = entrant_by_fsa_year[fsa_code].get(i)

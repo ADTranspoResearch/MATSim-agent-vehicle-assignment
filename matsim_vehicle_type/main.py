@@ -6,6 +6,7 @@ indicated vehicle ownership data.
 import gzip
 import xml.etree.ElementTree as ET
 import random
+from copy import deepcopy
 
 from matsim_vehicle_type.population.population import get_fsa_table
 from matsim_vehicle_type.vehicles.vehicle_assignment import (
@@ -17,6 +18,7 @@ from matsim_vehicle_type.config import (
     SCN_CASE,
     SCN_YEAR,
     POP_FILE,
+    TRANSIT_VEH_FILE,
     VEH_FILE,
     OUTPUT_DIR,
 )
@@ -165,6 +167,36 @@ def replace_vehicle_type_definitions(root):
         insert_at += 1
 
 
+def open_xml_text(path):
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8")
+    return path.open("rt", encoding="utf-8")
+
+
+def append_transit_vehicles(root, transit_vehicle_file=TRANSIT_VEH_FILE):
+    with open_xml_text(transit_vehicle_file) as f:
+        transit_root = ET.parse(f).getroot()
+
+    existing_ids = {
+        child.get("id")
+        for child in root
+        if child.tag.endswith("vehicle") and child.get("id")
+    }
+    appended_count = 0
+
+    for child in transit_root:
+        if not child.tag.endswith("vehicle"):
+            continue
+        vehicle_id = child.get("id")
+        if not vehicle_id or vehicle_id in existing_ids:
+            continue
+        root.append(deepcopy(child))
+        existing_ids.add(vehicle_id)
+        appended_count += 1
+
+    return appended_count
+
+
 def assign_matsim_users_vehicle_type(scenario_year=SCN_YEAR, scenario_type="historical"):
     random.seed(SEED)
 
@@ -199,6 +231,7 @@ def assign_matsim_users_vehicle_type(scenario_year=SCN_YEAR, scenario_type="hist
             vid = child.get("id")
             if vid in agent_id_list:
                 child.set("type", person_vehicle_dict[vid])
+    append_transit_vehicles(root)
 
     ET.register_namespace("", "http://www.matsim.org/files/dtd")
     tree = ET.ElementTree(root)
