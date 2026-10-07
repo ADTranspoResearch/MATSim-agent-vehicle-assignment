@@ -10,11 +10,12 @@ import shutil
 import struct
 import subprocess
 import sys
+import threading
 import xml.etree.ElementTree as ET
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +64,43 @@ URBAN_FOCUS_FSA_CODES = {
     "G2K",
     "G6W",
 }
+ProgressCallback = Callable[[int, int, str], None]
+
+_PROGRESS: dict[str, dict[str, Any]] = {}
+_PROGRESS_LOCK = threading.Lock()
+
+
+def progress_reporter(task_id: str | None) -> ProgressCallback | None:
+    """Return a callback that records step progress for a GUI task."""
+    if not task_id:
+        return None
+
+    def report(step: int, total: int, message: str) -> None:
+        with _PROGRESS_LOCK:
+            _PROGRESS[task_id] = {"step": step, "total": total, "message": message}
+
+    return report
+
+
+def read_progress(task_id: str) -> dict[str, Any]:
+    with _PROGRESS_LOCK:
+        return dict(_PROGRESS.get(task_id, {}))
+
+
+def clear_progress(task_id: str | None) -> None:
+    if not task_id:
+        return
+    with _PROGRESS_LOCK:
+        _PROGRESS.pop(task_id, None)
+
+
+def report_progress(
+    progress: ProgressCallback | None, step: int, total: int, message: str
+) -> None:
+    if progress is not None:
+        progress(step, total, message)
+
+
 VEHICLE_DISPLAY_ORDER = (
     "electric",
     "hev_sedan",
@@ -199,6 +237,7 @@ class AssignmentResult:
     transit_vehicle_count: int
     type_counts: dict[str, int]
     projected_share: list[dict[str, Any]]
+    fallback_fsas: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -511,8 +550,15 @@ def read_quebec_city_fsas(path: Path = QUEBEC_CITY_FSA_FILE) -> list[str]:
         ]
 
 
-def projected_population_for_fsa(fsa: str, year: int) -> tuple[float | None, int | None]:
-    path = FSA_PROJECTED_POP_DIR / f"{fsa.upper()}_projected_pop.csv"
+def projected_population_dir(config: dict[str, Any]) -> Path:
+    value = config.get("fsa_projected_pop_dir")
+    return resolve_path(value) if value else FSA_PROJECTED_POP_DIR
+
+
+def projected_population_for_fsa(
+    fsa: str, year: int, population_dir: Path = FSA_PROJECTED_POP_DIR
+) -> tuple[float | None, int | None]:
+    path = population_dir / f"{fsa.upper()}_projected_pop.csv"
     if not path.exists():
         return None, None
     values: dict[int, float] = {}
@@ -538,6 +584,7 @@ def projected_quebec_city_share(
 ) -> list[dict[str, Any]]:
     _, distribution = assignment_distribution(config, year, source, scenario, ev_factor)
     target_fsas = read_quebec_city_fsas()
+    population_dir = projected_population_dir(config)
     weighted: dict[str, float] = {}
     total_weight = 0.0
 
@@ -545,7 +592,7 @@ def projected_quebec_city_share(
         rows = normalized_vehicle_rows(distribution.get(fsa, []))
         if not rows:
             continue
-        population, _ = projected_population_for_fsa(fsa, year)
+        population, _ = projected_population_for_fsa(fsa, year, population_dir)
         weight = population if population and population > 0 else 1.0
         total_weight += weight
         for vehicle_type, share in rows:
@@ -672,6 +719,7 @@ def assign_vehicle_types(
     seed: int,
     ev_factor: float = 1.0,
     output_name: str | None = None,
+    progress: ProgressCallback | None = None,
 ) -> AssignmentResult:
     population_file = resolve_path(config["population_file"])
     vehicle_file = resolve_path(config["vehicle_file"])
@@ -680,16 +728,19 @@ def assign_vehicle_types(
     output_dir = resolve_path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    report_progress(progress, 1, 4, "Loading vehicle composition")
     distribution_file, distribution = assignment_distribution(
         config, year, source, scenario, ev_factor
     )
     fsa_lookup = read_fsa_lookup(fsa_lookup_file)
     rng = random.Random(seed)
 
+    report_progress(progress, 2, 4, "Reading MATSim population")
     with open_text(population_file) as stream:
         pop_tree = ET.parse(stream)
     person_vehicle: dict[str, str] = {}
     type_counts: dict[str, int] = {}
+    fallback_fsas: dict[str, int] = {}
     for person in pop_tree.getroot().findall(".//person"):
         person_id = person.get("id")
         if not person_id:
@@ -697,7 +748,11 @@ def assign_vehicle_types(
         vehicle_type = choose_vehicle_type(fsa_lookup.get(person_id, ""), distribution, rng)
         person_vehicle[person_id] = vehicle_type
         type_counts[vehicle_type] = type_counts.get(vehicle_type, 0) + 1
+        home_fsa = fsa_lookup.get(person_id, "")
+        if home_fsa not in distribution:
+            fallback_fsas[home_fsa or "(no FSA)"] = fallback_fsas.get(home_fsa or "(no FSA)", 0) + 1
 
+    report_progress(progress, 3, 4, "Updating MATSim vehicle file")
     with open_text(vehicle_file) as stream:
         vehicle_tree = ET.parse(stream)
     vehicle_root = vehicle_tree.getroot()
@@ -722,6 +777,7 @@ def assign_vehicle_types(
     else:
         output_file = output_dir / f"vehicles_updated_{year}_{scenario_label}{factor_label}_seed{seed}.xml"
 
+    report_progress(progress, 4, 4, "Writing assigned vehicle file")
     ET.register_namespace("", "http://www.matsim.org/files/dtd")
     vehicle_tree.write(output_file, encoding="utf-8", xml_declaration=True)
 
@@ -731,6 +787,7 @@ def assign_vehicle_types(
         assigned_count=len(person_vehicle),
         transit_vehicle_count=transit_vehicle_count,
         type_counts=dict(sorted(type_counts.items())),
+        fallback_fsas=dict(sorted(fallback_fsas.items())),
         projected_share=projected_quebec_city_share(
             config, year, scenario, ev_factor, source=source
         ),
@@ -1032,6 +1089,7 @@ def build_fsa_map_payload(
     unit: str,
     relevant_vehicle_counts: dict[str, int] | None = None,
     per_vehicle_unit: str = "",
+    population_dir: Path = FSA_PROJECTED_POP_DIR,
 ) -> dict[str, Any]:
     values = read_result_values(result_csv, metric_column)
     relevant_vehicle_counts = relevant_vehicle_counts or {}
@@ -1060,7 +1118,9 @@ def build_fsa_map_payload(
             continue
         has_data = shape.fsa in values
         value = values.get(shape.fsa)
-        population, pop_year = projected_population_for_fsa(shape.fsa, population_year)
+        population, pop_year = projected_population_for_fsa(
+            shape.fsa, population_year, population_dir
+        )
         relevant_vehicle_count = relevant_vehicle_counts.get(shape.fsa)
         per_vehicle = None
         if value is not None and relevant_vehicle_count and relevant_vehicle_count > 0:
@@ -1180,6 +1240,7 @@ def run_emission_module(
     year: int,
     scenario: str,
     vehicle_file: str,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     maven_command = next(
         (candidate for candidate in MAVEN_CANDIDATES if shutil.which(candidate)),
@@ -1192,6 +1253,7 @@ def run_emission_module(
 
     emission_module_dir = resolve_path(config["emission_module_dir"])
     events_file = resolve_path(config["matsim_events_file"])
+    report_progress(progress, 1, 2, "Writing emission run configuration")
     generated_config, emission_events_file = create_emission_run_config(
         config, year, scenario, vehicle_file
     )
@@ -1203,6 +1265,7 @@ def run_emission_module(
         f"-Demission.events.input={events_file}",
         f"-Dexec.args={generated_config}",
     ]
+    report_progress(progress, 2, 2, "Running MATSim emission module")
     completed = subprocess.run(
         command,
         cwd=emission_module_dir,
@@ -1228,11 +1291,30 @@ def run_emission_module(
     }
 
 
+def emission_events_for_scenario(config: dict[str, Any], year: int, scenario: str) -> Path:
+    """Prefer emission events produced for this year and scenario.
+
+    Looks for the emission module output folder first, then for the
+    ``emission.events.offline.<year>.<scenario>.xml.gz`` naming used by the
+    post-processing scripts, and falls back to the configured file.
+    """
+    events_dir = resolve_path(config["emission_events_dir"])
+    candidates = (
+        events_dir / emission_output_label(year, scenario) / "emission.events.offline.xml.gz",
+        events_dir / f"emission.events.offline.{year}.{scenario}.xml.gz",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return resolve_path(config["emission_events_file"])
+
+
 def generate_co2_results(
     config: dict[str, Any],
     year: int,
     scenario: str,
     emission_events_file: str | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     module = load_script_module(
         "platform_co2_results",
@@ -1240,18 +1322,25 @@ def generate_co2_results(
     )
     output_dir = resolve_path(config["results_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
-    events_path = resolve_path(emission_events_file or config["emission_events_file"])
+    events_path = (
+        resolve_path(emission_events_file)
+        if emission_events_file
+        else emission_events_for_scenario(config, year, scenario)
+    )
     fsa_lookup = module.read_fsa_csv(resolve_path(config["fsa_lookup_file"]))
 
+    report_progress(progress, 1, 4, "Reading emission events")
     co2_by_agent, co2_by_fsa, agent_by_vehicle, events, unmatched = (
         module.summarize_emission_events(events_path, fsa_lookup)
     )
     fsa_csv = output_dir / f"co2_emissions_by_fsa_{year}_{scenario}.csv"
     agent_csv = output_dir / f"co2_emissions_by_agent_{year}_{scenario}.csv"
     heatmap = output_dir / f"co2_emissions_by_fsa_{year}_{scenario}.png"
+    report_progress(progress, 2, 4, "Writing CO2 tables")
     module.write_agent_csv(agent_csv, str(year), scenario, co2_by_agent, fsa_lookup)
     module.write_fsa_csv(fsa_csv, str(year), scenario, co2_by_fsa)
     max_value = module.max_co2_value([fsa_csv])
+    report_progress(progress, 3, 4, "Rendering heatmap image")
     module.plot_fsa_heatmap(
         fsa_csv,
         resolve_path(config["fsa_shapefile"]),
@@ -1262,6 +1351,7 @@ def generate_co2_results(
         crop_to_urban=True,
     )
     relevant_vehicle_counts = count_fsa_items(co2_by_agent.keys(), fsa_lookup)
+    report_progress(progress, 4, 4, "Building interactive map")
 
     return {
         "metric": "CO2 emissions",
@@ -1272,6 +1362,7 @@ def generate_co2_results(
         "csv": display_path(fsa_csv),
         "agent_csv": display_path(agent_csv),
         "heatmap": display_path(heatmap),
+        "emission_events_file": display_path(events_path),
         "top_fsa": read_top_rows(fsa_csv, "co2_t_per_day"),
         "map": build_fsa_map_payload(
             fsa_csv,
@@ -1281,6 +1372,7 @@ def generate_co2_results(
             "t/day",
             relevant_vehicle_counts=relevant_vehicle_counts,
             per_vehicle_unit="t/day/vehicle",
+            population_dir=projected_population_dir(config),
         ),
     }
 
@@ -1290,6 +1382,7 @@ def generate_ev_results(
     year: int,
     scenario: str,
     vehicle_file: str,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     module = load_script_module(
         "platform_ev_results",
@@ -1306,12 +1399,15 @@ def generate_ev_results(
     shares = module.read_historical_shares(
         resolve_path(config["historical_bev_share_file"]), historical_year
     )
+    report_progress(progress, 1, 5, "Reading assigned vehicle file")
     electric_vehicles = module.read_electric_vehicles(vehicle_path)
+    report_progress(progress, 2, 5, "Reading network and MATSim events")
     link_lengths = module.read_link_lengths(network_path)
     vehicle_metres, agent_by_vehicle, missing_links = module.summarize_event_distances(
         events_path, electric_vehicles, link_lengths
     )
     fsa_by_agent = module.read_fsa_csv(fsa_file)
+    report_progress(progress, 3, 5, "Writing electricity tables")
     fsa_csv, type_csv = module.write_fsa_and_type_csvs(
         str(year),
         scenario,
@@ -1324,10 +1420,12 @@ def generate_ev_results(
     )
     max_value = max(module.read_map_values(fsa_csv).values() or [0])
     heatmap = fsa_csv.with_suffix(".png")
+    report_progress(progress, 4, 5, "Rendering heatmap image")
     module.plot_fsa_heatmap(fsa_csv, heatmap, max_value)
     relevant_vehicle_counts = count_ev_vehicles_by_fsa(
         electric_vehicles, agent_by_vehicle, fsa_by_agent
     )
+    report_progress(progress, 5, 5, "Building interactive map")
 
     return {
         "metric": "EV electricity demand",
@@ -1338,6 +1436,7 @@ def generate_ev_results(
         "csv": display_path(fsa_csv),
         "type_csv": display_path(type_csv),
         "heatmap": display_path(heatmap),
+        "vehicle_file": display_path(vehicle_path),
         "top_fsa": read_top_rows(fsa_csv, "electricity_gwh_per_year"),
         "map": build_fsa_map_payload(
             fsa_csv,
@@ -1347,6 +1446,7 @@ def generate_ev_results(
             "GWh/year",
             relevant_vehicle_counts=relevant_vehicle_counts,
             per_vehicle_unit="GWh/year/EV",
+            population_dir=projected_population_dir(config),
         ),
     }
 
