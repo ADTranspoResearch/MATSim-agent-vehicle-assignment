@@ -14,6 +14,8 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import Mock, patch
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 import numpy as np
 import pandas as pd
@@ -21,6 +23,20 @@ import pandas as pd
 from matsim_vehicle_type import batch
 from matsim_vehicle_type.fleet import composition, growth
 from platform_gui import core
+
+
+BUS_TYPE_XML = '''<vehicleType id="Bus">
+  <attributes><attribute name="doorOperationMode" class="org.matsim.vehicles.VehicleType$DoorOperationMode">serial</attribute></attributes>
+  <description>Transit bus</description>
+  <capacity seats="70" standingRoomInPersons="0"/>
+  <length meter="18.0"/><width meter="2.5"/><maximumVelocity meterPerSecond="25"/>
+  <engineInformation><attributes>
+    <attribute name="HbefaVehicleCategory" class="java.lang.String">old</attribute>
+  </attributes></engineInformation>
+  <costInformation fixedCostsPerDay="10"/>
+  <passengerCarEquivalents pce="2.8"/><networkMode networkMode="bus"/>
+  <flowEfficiencyFactor factor="1.0"/>
+</vehicleType>'''
 
 
 class BatchTests(unittest.TestCase):
@@ -93,8 +109,8 @@ class BatchTests(unittest.TestCase):
 
     def test_vehicle_namespace_and_bus_metadata_are_preserved(self):
         source = self.root / "input.xml"
-        source.write_text('''<vehicleDefinitions xmlns="http://www.matsim.org/files/dtd">
-          <vehicleType id="Bus"><capacity seats="70"/><networkMode networkMode="bus"/></vehicleType>
+        source.write_text(f'''<vehicleDefinitions xmlns="http://www.matsim.org/files/dtd">
+          {BUS_TYPE_XML}
           <vehicleType id="defaultVehicleType"/>
           <vehicle id="0" type="defaultVehicleType"/><vehicle id="veh_0_bus" type="Bus"/>
           </vehicleDefinitions>''')
@@ -105,10 +121,47 @@ class BatchTests(unittest.TestCase):
             root = ET.parse(stream).getroot()
         ns = {"v": "http://www.matsim.org/files/dtd"}
         self.assertEqual(root.find("v:vehicle[@id='veh_0_bus']", ns).get("type"), "Bus")
-        self.assertEqual(root.find("v:vehicleType[@id='Bus']/v:capacity", ns).get("seats"), "70")
-        self.assertIsNotNone(root.find("v:vehicleType[@id='Bus']/v:engineInformation", ns))
+        bus = root.find("v:vehicleType[@id='Bus']", ns)
+        # MATSim's vehicleDefinitions_v2.0.xsd requires this child sequence.
+        self.assertEqual([node.tag.rsplit("}", 1)[-1] for node in bus], [
+            "attributes", "description", "capacity", "length", "width", "maximumVelocity",
+            "engineInformation", "costInformation", "passengerCarEquivalents", "networkMode", "flowEfficiencyFactor"])
+        self.assertEqual(bus.find("v:capacity", ns).get("seats"), "70")
+        self.assertEqual(bus.find("v:attributes/v:attribute", ns).text, "serial")
+        self.assertEqual(bus.find("v:maximumVelocity", ns).get("meterPerSecond"), "25")
+        self.assertEqual(bus.find("v:costInformation", ns).get("fixedCostsPerDay"), "10")
+        self.assertEqual(bus.find("v:passengerCarEquivalents", ns).get("pce"), "2.8")
+        category = bus.find("v:engineInformation/v:attributes/v:attribute[@name='HbefaVehicleCategory']", ns)
+        self.assertEqual(category.text, "Bus")
         self.assertEqual(root.find("v:vehicle[@id='0']", ns).get("type"), assigned.vehicle_type.iloc[0])
         self.assertEqual(batch.read_vehicle_inventory(target), (["0"], {"veh_0_bus"}))
+
+    def test_emission_config_path_with_spaces_and_commas_is_one_argument(self):
+        config = self.root / "Research Data, scenario's run" / "emission_config.xml"
+        options = batch.BatchOptions()
+        path = self.root / "emission.log"
+        with patch.object(batch, "maven_command", return_value="mvn"), patch.object(batch, "run_logged") as run:
+            batch.run_emission(options, config, path)
+        command = run.call_args.args[0]
+        self.assertIn("-Dexec.arguments=${env.MATSIM_BATCH_CONFIG_URI}", command)
+        self.assertFalse(any(part.startswith("-Dexec.args=") for part in command))
+        uri = run.call_args.kwargs["extra_env"]["MATSIM_BATCH_CONFIG_URI"]
+        self.assertEqual(urlsplit(uri).scheme, "file")
+        self.assertEqual(Path(url2pathname(urlsplit(uri).path)), config.resolve())
+        self.assertIn("%20", uri)
+        self.assertIn("%2C", uri)
+        self.assertNotIn(uri, command)
+
+    def test_maven_receives_config_environment_without_changing_parent(self):
+        options = batch.BatchOptions()
+        uri = "file:///C:/Users/qchen7/Research%20Data/emission_config.xml"
+        process = Mock()
+        process.wait.return_value = 0
+        with patch.dict(os.environ, {"MATSIM_BATCH_CONFIG_URI": "parent"}), patch.object(batch.subprocess, "Popen", return_value=process) as popen:
+            batch.run_logged(["mvn", "exec:java"], options, self.root / "emission.log",
+                             extra_env={"MATSIM_BATCH_CONFIG_URI": uri})
+            self.assertEqual(popen.call_args.kwargs["env"]["MATSIM_BATCH_CONFIG_URI"], uri)
+            self.assertEqual(os.environ["MATSIM_BATCH_CONFIG_URI"], "parent")
 
     def test_driver_mapping_ignores_passengers_and_counts_left_links(self):
         path = self.root / "events.xml"
@@ -236,6 +289,8 @@ class BatchTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("RUN_MATSIM_BATCH_INTEGRATION") == "1", "real Java test is opt-in")
     def test_real_java_module_on_two_link_fixture(self):
         """Explicit opt-in invokes Java only on a tiny generated simulation."""
+        self.root = self.root / "Research Data, scenario's run"
+        self.root.mkdir()
         options = batch.BatchOptions(output_dir=self.root, events=self.root / "events.xml", network=self.root / "network.xml")
         options.network.write_text('''<?xml version="1.0"?>
           <!DOCTYPE network SYSTEM "http://www.matsim.org/files/dtd/network_v2.dtd">
@@ -254,7 +309,11 @@ class BatchTests(unittest.TestCase):
           <event time="3660" type="vehicle leaves traffic" person="person0" vehicle="0" link="L2" networkMode="car" relativePosition="1"/>
           </events>''')
         source = self.root / "input.xml"
-        source.write_text('<vehicleDefinitions xmlns="http://www.matsim.org/files/dtd"><vehicle id="0" type="defaultVehicleType"/></vehicleDefinitions>')
+        source.write_text(f'''<vehicleDefinitions xmlns="http://www.matsim.org/files/dtd"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://www.matsim.org/files/dtd http://www.matsim.org/files/dtd/vehicleDefinitions_v2.0.xsd">
+          {BUS_TYPE_XML}<vehicle id="0" type="defaultVehicleType"/><vehicle id="veh_0_bus" type="Bus"/>
+          </vehicleDefinitions>''')
         distribution = {"shares": {"G1B": batch.checked_shares({"ice_sedan": 1})}, "city_average": batch.checked_shares({"ice_sedan": 1})}
         assigned = batch.assign_frame(self.base(1), distribution, 2035, "bau", 1, self.body_shares, self.ev)
         vehicle_path = self.root / "vehicles.xml.gz"
@@ -262,9 +321,8 @@ class BatchTests(unittest.TestCase):
         config = batch.write_emission_config(options, self.root, vehicle_path, 1)
         (self.root / "emission").mkdir()
         batch.run_logged([batch.maven_command(), "-q", "-DskipTests", "compile"], options, self.root / "build.log")
-        batch.run_logged([batch.maven_command(), "-q", "exec:java", f"-Dexec.mainClass={core.AVERAGE_EMISSION_MAIN_CLASS}",
-                          f"-Demission.events.input={options.events}", f"-Dexec.args={config}"], options, self.root / "run.log")
-        grams, _ = batch.summarize_emissions(self.root / "emission/emission.events.offline.xml.gz", {"0"}, set())
+        batch.run_emission(options, config, self.root / "run.log")
+        grams, _ = batch.summarize_emissions(self.root / "emission/emission.events.offline.xml.gz", {"0"}, {"veh_0_bus"})
         self.assertGreater(grams.get("0", 0), 0)
         result, _ = batch.daily_fsa_results(assigned, grams, ["G1B", "UNKNOWN"], 2035, "bau", 1)
         self.assertAlmostEqual(result.total_co2_kg_per_day.sum(), grams["0"] / 1000)

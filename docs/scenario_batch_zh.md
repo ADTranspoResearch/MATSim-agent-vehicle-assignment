@@ -43,6 +43,13 @@ python3 scripts/run_scenario_batch.py --output-dir /path/to/batch_100 --java-hea
 每个路径都可通过命令行覆盖，具体参数见 `--help`。同一个输出目录只允许一个批处理进程。
 文件锁自动选择 Windows 内置 `msvcrt` 或 macOS/Linux 内置 `fcntl`，无需安装额外的锁依赖。
 
+### Windows 日志排错
+
+- `FileNotFoundException: C:\Users\…\Research`：旧版程序把配置路径放入 Maven 的 `exec.args`，路径中的空格会被再次拆分。新版使用 `exec.arguments`，通过子进程环境变量传递编码后的配置文件 URI，兼容路径中的空格、逗号和引号。
+- `Invalid content ... engineInformation`：旧版程序把公交车型的引擎信息追加到了 `vehicleType` 末尾。MATSim `vehicleDefinitions_v2.0.xsd` 要求它位于 `maximumVelocity` 之后、`costInformation` / `passengerCarEquivalents` / `networkMode` / `flowEfficiencyFactor` 之前；新版按该顺序插入，并保留公交的容量、尺寸和其他运行参数。
+
+拉取修复后，原输出目录的代码身份会与新版不一致。保留原目录作为诊断记录，在原运行命令中把 `--output-dir` 改成**尚未使用的新目录**，例如 `C:\Users\qchen7\ResearchData\data\output\batch_100_fixed`，其余输入参数沿用原值。程序会在新目录重新生成车辆 XML；仅拉取代码不会修复旧目录中已有的车辆文件。不要手工修改 `inputs.json` 或阶段完成记录来绕过身份验证。
+
 ## 指标定义
 
 全部结果针对一个模拟日，扩样系数为 **1**，不乘 10 或 365。
@@ -112,4 +119,4 @@ python3 -m unittest discover -s tests -p 'test_scenario_batch.py'
 RUN_MATSIM_BATCH_INTEGRATION=1 python3 -m unittest discover -s tests -p 'test_scenario_batch.py'
 ```
 
-测试覆盖重复 seed、排序稳定性、公交元数据、缺失 FSA、驾驶员映射、零 EV、零里程 EV、日单位、warm/cold 汇总、样本标准差、事件清理后的恢复、Windows 文件锁选择、并发互斥与异常后释放，以及正式模型显式情境参数的兼容性。
+测试样例覆盖重复 seed、排序稳定性、公交元数据及 XML 元素顺序、含空格和逗号的配置路径、Maven 子进程环境、缺失 FSA、驾驶员映射、零 EV、零里程 EV、日单位、warm/cold 汇总、样本标准差、事件清理后的恢复、Windows 文件锁选择、并发互斥与异常后释放，以及正式模型显式情境参数的兼容性。真实 Java 集成样例包含公交车型，并使用带空格、逗号和引号的输出路径；本次仍未执行这些测试。

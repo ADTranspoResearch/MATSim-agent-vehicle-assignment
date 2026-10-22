@@ -466,7 +466,12 @@ def write_assigned_vehicles(source: Path, target: Path, assigned: pd.DataFrame) 
             for engine in list(node):
                 if engine.tag.rsplit("}", 1)[-1] == "engineInformation":
                     node.remove(engine)
-            node.append(deepcopy(templates["Bus"].find(namespace + "engineInformation")))
+            # vehicleDefinitions_v2.0.xsd uses a sequence: engineInformation
+            # follows maximumVelocity and precedes all of these optional fields.
+            following = {"costInformation", "passengerCarEquivalents", "networkMode", "flowEfficiencyFactor"}
+            engine_at = next((i for i, child in enumerate(node)
+                              if child.tag.rsplit("}", 1)[-1] in following), len(node))
+            node.insert(engine_at, deepcopy(templates["Bus"].find(namespace + "engineInformation")))
         elif kind in templates:
             root.remove(node)
     insert_at = next((i for i, node in enumerate(root) if node.tag.rsplit("}", 1)[-1] == "vehicle"), len(root))
@@ -588,12 +593,27 @@ def maven_environment(options: BatchOptions):
     return env
 
 
-def run_logged(command: list[str], options: BatchOptions, path: Path):
+def run_emission(options: BatchOptions, config: Path, path: Path) -> None:
+    # exec.args is parsed as a command line a second time, splitting unquoted
+    # paths on spaces. Pass one exec.arguments item as a file URI instead.
+    # URI encoding protects commas (Maven array separators) and backslashes;
+    # environment interpolation keeps percent escapes out of Windows cmd parsing.
+    command = [maven_command(), "-q", "exec:java", f"-Dexec.mainClass={core.AVERAGE_EMISSION_MAIN_CLASS}",
+               f"-Demission.events.input={options.events}", "-Dexec.arguments=${env.MATSIM_BATCH_CONFIG_URI}"]
+    run_logged(command, options, path, extra_env={"MATSIM_BATCH_CONFIG_URI": config.resolve().as_uri()})
+
+
+def run_logged(command: list[str], options: BatchOptions, path: Path, *, extra_env: dict[str, str] | None = None):
     log(f"Starting Maven; log: {path}")
+    env = maven_environment(options)
+    if extra_env:
+        env.update(extra_env)
     with path.open("w", encoding="utf-8") as stream:
         stream.write(json.dumps(command) + "\n")
+        if extra_env:
+            stream.write(json.dumps(extra_env) + "\n")
         stream.flush()
-        process = subprocess.Popen(command, cwd=options.emission_module, env=maven_environment(options),
+        process = subprocess.Popen(command, cwd=options.emission_module, env=env,
                                    stdout=stream, stderr=subprocess.STDOUT)
         try:
             while True:
@@ -765,8 +785,7 @@ def _run_batch(options: BatchOptions) -> None:
                     if raw_events.exists():
                         # Only a failed/incomplete artifact inside this run directory.
                         raw_events.unlink()
-                    run_logged([maven_command(), "-q", "exec:java", f"-Dexec.mainClass={core.AVERAGE_EMISSION_MAIN_CLASS}",
-                                f"-Demission.events.input={options.events}", f"-Dexec.args={config}"], options, run_dir / "emission.log")
+                    run_emission(options, config, run_dir / "emission.log")
                     if not raw_events.is_file() or raw_events.stat().st_size == 0:
                         raise RuntimeError(f"{run_id}: emission module did not write {raw_events}")
                     save_stage(emission_marker, run_key, [raw_events, config])
