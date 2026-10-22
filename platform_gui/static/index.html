@@ -794,10 +794,10 @@
       const source = $("source").value;
       const year = $("year").value;
       const scenarios = source === "predicted"
-        ? (options.predicted_scenarios?.[year] || ["BAU"])
+        ? (options.predicted_scenarios?.[year] || ["bau"])
         : ["HISTORICAL"];
       $("scenario").innerHTML = scenarios.map(s => `<option value="${s}">${s}</option>`).join("");
-      if (scenarios.includes("BAU")) $("scenario").value = "BAU";
+      if (scenarios.includes("bau")) $("scenario").value = "bau";
       updateEvFactorVisibility();
     }
 

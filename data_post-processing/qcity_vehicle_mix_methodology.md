@@ -1,6 +1,6 @@
 # Quebec City EV Body-Type Split Methodology
 
-The total EV share in each plot comes from `data/vehicles/val_outputs/BAU/H0H_predicted_fleet_mix.csv`.
+The total EV share in each plot comes from `data/vehicles/val_outputs/bau/H0H_predicted_fleet_mix.csv`.
 
 To split the EV share into body types, Quebec battery-electric registration counts were taken from `data/2310030801-eng.numbers`, which corresponds to Statistics Canada Table 23-10-0308-01, "Vehicle registrations, by type of vehicle and fuel type": https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=2310030801
 

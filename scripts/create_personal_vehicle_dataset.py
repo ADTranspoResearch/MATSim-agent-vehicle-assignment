@@ -7,6 +7,7 @@ import pandas as pd
 import _setup_path  # pylint: disable=unused-import
 from matsim_vehicle_type.config import DATA_DIR
 from matsim_vehicle_type.vehicles.vehicle_distribution import get_vehicle_type
+from pathlib import Path
 
 fleet_path = DATA_DIR / "vehicles" / "ownership"
 output_path = fleet_path / "personal_ownership"
@@ -36,13 +37,21 @@ columns_to_drop = [
     "TCPP",
     "Autonomie",
 ]
-
+drive_path = Path("/Volumes/SAMSUNG USB/SAAQ")
 for i in range(13, 21):
     filename = f"McGill_SAAQ_20{i}_2024-01-10.csv"
-    filepath = fleet_path / filename
+    filepath = drive_path / filename
     print(f"running {filename}.")
     df = pd.read_csv(filepath, sep=";", decimal=",", encoding="utf-16", dtype=dtype_map)
     df = df.loc[df["Usage"] == "Personnel"]
+
+    # Exclude vehicles older than 15 years (registration year minus production year).
+    vehicle_age = (
+        pd.to_numeric(df["AnneeSAAQ"], errors="coerce")
+        - pd.to_numeric(df["ANV"], errors="coerce")
+    )
+    df = df.loc[~vehicle_age.gt(15)].copy()
+
     # df = df.loc[df["RTA"].isin(PC_QC)]
     df["vehicle_type"] = df.apply(get_vehicle_type, axis=1)
     df.drop(columns=columns_to_drop, inplace=True)

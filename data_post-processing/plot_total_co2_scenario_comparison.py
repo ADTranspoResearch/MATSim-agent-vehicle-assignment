@@ -17,10 +17,10 @@ OUTPUT_PNG = RESULTS_DIR / "total_co2_scenario_comparison.png"
 
 SCENARIO_ORDER = [
     ("2020", "REF", "2020 REF"),
-    ("2035", "BAU", "2035 BAU"),
-    ("2035", "DELAYED_ADOPTION", "2035 Delayed"),
-    ("2035", "POLICY_ALIGNED", "2035 Policy-aligned"),
-    ("2035", "ACCELERATED_ADOPTION", "2035 Accelerated"),
+    ("2035", "bau", "2035 bau"),
+    ("2035", "del_adopt", "2035 Delayed"),
+    ("2035", "pol_align", "2035 Policy-aligned"),
+    ("2035", "acc_adopt", "2035 Accelerated"),
 ]
 
 
@@ -97,10 +97,10 @@ def draw_bar_chart(
 
     colors = {
         "REF": (220, 74, 35),
-        "BAU": (244, 151, 52),
-        "DELAYED_ADOPTION": (246, 180, 76),
-        "POLICY_ALIGNED": (251, 202, 93),
-        "ACCELERATED_ADOPTION": (255, 223, 130),
+        "bau": (244, 151, 52),
+        "del_adopt": (246, 180, 76),
+        "pol_align": (251, 202, 93),
+        "acc_adopt": (255, 223, 130),
     }
     annotation_color = (35, 125, 68)
 

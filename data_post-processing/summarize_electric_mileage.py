@@ -33,7 +33,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 YEAR = 2035
 
-VEHICLES_FILE_NAME = f"vehicles_updated_{YEAR}_BAU.xml"
+VEHICLES_FILE_NAME = f"vehicles_{YEAR}_bau.xml"
 VEHICLES_FILE_DIR = PROJECT_ROOT / "output"
 VEHICLES_FILE = VEHICLES_FILE_DIR / VEHICLES_FILE_NAME
 

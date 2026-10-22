@@ -40,22 +40,22 @@ FSA_SHAPEFILE = PROJECT_ROOT / "data" / "FSA" / "quebec_fsa" / "quebec_fsa.shp"
 HISTORICAL_SHARE_FILE = RESULTS_DIR / "battery_electric_vehicle_type_share_quebec.csv"
 
 SCENARIOS = [
-    ("2020", "REF", PROJECT_ROOT / "output" / "vehicles_updated_2020_REF.xml"),
-    ("2035", "BAU", PROJECT_ROOT / "output" / "vehicles_updated_2035_BAU.xml"),
+    ("2020", "REF", PROJECT_ROOT / "output" / "vehicles_2020_REF.xml"),
+    ("2035", "bau", PROJECT_ROOT / "output" / "vehicles_2035_bau.xml"),
     (
         "2035",
-        "DELAYED_ADOPTION",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_DELAYED_ADOPTION.xml",
+        "del_adopt",
+        PROJECT_ROOT / "output" / "vehicles_2035_del_adopt.xml",
     ),
     (
         "2035",
-        "POLICY_ALIGNED",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_POLICY_ALIGNED.xml",
+        "pol_align",
+        PROJECT_ROOT / "output" / "vehicles_2035_pol_align.xml",
     ),
     (
         "2035",
-        "ACCELERATED_ADOPTION",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_ACCELERATED_ADOPTION.xml",
+        "acc_adopt",
+        PROJECT_ROOT / "output" / "vehicles_2035_acc_adopt.xml",
     ),
 ]
 
@@ -190,7 +190,14 @@ def normalize_shares(shares: dict[str, float]) -> dict[str, float]:
 
 
 def assign_vehicle_type(agent_id: str, scenario: str, shares: dict[str, float]) -> str:
-    digest = hashlib.sha256(f"{scenario}:{agent_id}".encode("utf-8")).digest()
+    # Keep the existing random draws when only the scenario name changes.
+    draw_scenario = {
+        "bau": "BAU",
+        "acc_adopt": "ACCELERATED_ADOPTION",
+        "del_adopt": "DELAYED_ADOPTION",
+        "pol_align": "POLICY_ALIGNED",
+    }.get(scenario, scenario)
+    digest = hashlib.sha256(f"{draw_scenario}:{agent_id}".encode("utf-8")).digest()
     value = int.from_bytes(digest[:8], "big") / 2**64
     cumulative = 0.0
     last_type = next(reversed(shares))
@@ -614,10 +621,10 @@ def plot_total_bar(path: Path, total_csv: Path) -> None:
     colors = [(229, 245, 224), (199, 233, 192), (161, 217, 155), (65, 171, 93), (0, 109, 44)]
     labels = {
         "REF": "2020 REF",
-        "BAU": "2035 BAU",
-        "DELAYED_ADOPTION": "2035 Delayed",
-        "POLICY_ALIGNED": "2035 Policy-aligned",
-        "ACCELERATED_ADOPTION": "2035 Accelerated",
+        "bau": "2035 bau",
+        "del_adopt": "2035 Delayed",
+        "pol_align": "2035 Policy-aligned",
+        "acc_adopt": "2035 Accelerated",
     }
     for idx, row in enumerate(rows):
         value = float(row["electricity_gwh_per_year"])

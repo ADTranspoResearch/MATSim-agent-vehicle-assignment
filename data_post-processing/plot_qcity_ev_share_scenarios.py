@@ -26,24 +26,24 @@ OUTPUT_DIR = SCRIPT_DIR / "results"
 NEW_VEHICLE_SECTION = "# ---------- Predicted New Vehicle Mix ----------"
 
 SCENARIOS = [
-    ("BAU", "BAU"),
-    ("ACCELERATED_ADOPTION", "Accelerated adoption"),
-    ("DELAYED_ADOPTION", "Delayed adoption"),
-    ("POLICY_ALIGNED", "Policy-aligned"),
+    ("bau", "bau"),
+    ("acc_adopt", "Accelerated adoption"),
+    ("del_adopt", "Delayed adoption"),
+    ("pol_align", "Policy-aligned"),
 ]
 
 SCENARIO_STYLES = {
-    "BAU": {"color": "#2a9d8f", "marker": "o", "linestyle": "-"},
-    "ACCELERATED_ADOPTION": {"color": "#457b9d", "marker": "s", "linestyle": "-"},
-    "DELAYED_ADOPTION": {"color": "#e76f51", "marker": "^", "linestyle": "--"},
-    "POLICY_ALIGNED": {"color": "#6a4c93", "marker": "D", "linestyle": "-."},
+    "bau": {"color": "#2a9d8f", "marker": "o", "linestyle": "-"},
+    "acc_adopt": {"color": "#457b9d", "marker": "s", "linestyle": "-"},
+    "del_adopt": {"color": "#e76f51", "marker": "^", "linestyle": "--"},
+    "pol_align": {"color": "#6a4c93", "marker": "D", "linestyle": "-."},
 }
 
 LABEL_OFFSETS = {
-    "BAU": {"x": -0.06, "y": -0.034, "va": "top"},
-    "ACCELERATED_ADOPTION": {"x": 0.0, "y": 0.024, "va": "bottom"},
-    "DELAYED_ADOPTION": {"x": 0.06, "y": -0.028, "va": "top"},
-    "POLICY_ALIGNED": {"x": 0.08, "y": 0.020, "va": "bottom"},
+    "bau": {"x": -0.06, "y": -0.034, "va": "top"},
+    "acc_adopt": {"x": 0.0, "y": 0.024, "va": "bottom"},
+    "del_adopt": {"x": 0.06, "y": -0.028, "va": "top"},
+    "pol_align": {"x": 0.08, "y": 0.020, "va": "bottom"},
 }
 
 

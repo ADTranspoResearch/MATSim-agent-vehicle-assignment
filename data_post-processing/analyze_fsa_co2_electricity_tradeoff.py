@@ -13,10 +13,10 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 RESULTS_DIR = SCRIPT_DIR / "results"
 
 SCENARIOS = [
-    ("2035", "BAU", "2035 Business-as-usual"),
-    ("2035", "DELAYED_ADOPTION", "2035 Delayed adoption"),
-    ("2035", "POLICY_ALIGNED", "2035 Policy-aligned"),
-    ("2035", "ACCELERATED_ADOPTION", "2035 Accelerated adoption"),
+    ("2035", "bau", "2035 Business-as-usual"),
+    ("2035", "del_adopt", "2035 Delayed adoption"),
+    ("2035", "pol_align", "2035 Policy-aligned"),
+    ("2035", "acc_adopt", "2035 Accelerated adoption"),
 ]
 
 

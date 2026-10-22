@@ -3,7 +3,7 @@
   "vehicle_file": "data/MATSim/vehicles/output_vehicles.xml.gz",
   "transit_vehicle_file": "data/MATSim/vehicles/transit_vehicles.xml",
   "matsim_events_file": "data/MATSim/events/output_events.xml.gz",
-  "emission_events_file": "data/MATSim/emission_events/emission.events.offline.2035.BAU.xml.gz",
+  "emission_events_file": "data/MATSim/emission_events/emission.events.offline.2035.bau.xml.gz",
   "emission_events_dir": "data/MATSim/emission_events",
   "emission_config_dir": "data/MATSim/emission_configs",
   "emission_config_template": "matsim-emissions/QC_input_data/config/config_average.xml",

@@ -115,7 +115,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
                         "projected_share": core.projected_quebec_city_share(
                             config=config,
                             year=int(payload["year"]),
-                            scenario=payload.get("scenario") or "BAU",
+                            scenario=payload.get("scenario") or "bau",
                             ev_factor=float(payload.get("ev_factor", 1.0)),
                             source=payload.get("source") or "predicted",
                         )
@@ -125,7 +125,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 config = payload.get("config") or core.load_config()
                 metric = payload.get("metric")
                 year = int(payload["year"])
-                scenario = payload.get("scenario") or "BAU"
+                scenario = payload.get("scenario") or "bau"
                 core.save_config(config)
                 if metric == "co2":
                     self.send_json(
@@ -147,7 +147,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 result = core.run_emission_module(
                     config=config,
                     year=int(payload["year"]),
-                    scenario=payload.get("scenario") or "BAU",
+                    scenario=payload.get("scenario") or "bau",
                     vehicle_file=payload["vehicle_file"],
                     progress=progress,
                 )

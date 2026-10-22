@@ -121,7 +121,7 @@ def read_fsa_csv(path: Path) -> dict[str, str]:
 
 def infer_year_scenario(path: Path) -> tuple[str, str]:
     # Expected file name:
-    # emission.events.offline.2035.ACCELERATED_ADOPTION.xml.gz
+    # emission.events.offline.2035.acc_adopt.xml.gz
     name = path.name
     for suffix in (".xml.gz", ".xml"):
         if name.endswith(suffix):

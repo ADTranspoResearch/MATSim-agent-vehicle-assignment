@@ -23,6 +23,16 @@ platform_gui/config.json
 data_post-processing/results/
 output/*.xml
 
+# Local independent Gompertz experiments (code, dependencies, tests, and results).
+/matsim_vehicle_type/fleet/gompertz.py
+/requirements-qcity-gompertz.txt
+/scripts/compare_qcity_ev_models.py
+/scripts/predict_qcity_gompertz_fleet.py
+/tests/test_qcity_gompertz.py
+/tests/test_qcity_gompertz_fleet.py
+/output/qcity_ev_model_comparison/
+/output/qcity_gompertz_fleet_projection/
+
 # Local MATSim emissions checkout and scenario data.
 matsim-emissions/
 

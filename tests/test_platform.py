@@ -71,22 +71,22 @@ class IndicatorTests(unittest.TestCase):
             if row["fsa"] == "NAN":
                 continue
             by.setdefault(row["scenario"], {})[row["fsa"]] = {k: float(v) for k, v in row.items() if k not in ("fsa", "scenario")}
-        fsas = sorted(by["BAU"])
+        fsas = sorted(by["bau"])
         col = lambda s, c: np.array([by[s][f][c] for f in fsas])  # noqa: E731
         ref_co2, ref_gwh = col("REF2020", "co2_kt_yr"), col("REF2020", "ev_electricity_GWh_yr")
-        co2, gwh = col("BAU", "co2_kt_yr"), col("BAU", "ev_electricity_GWh_yr")
-        agents = col("BAU", "n_agents")
+        co2, gwh = col("bau", "co2_kt_yr"), col("bau", "ev_electricity_GWh_yr")
+        agents = col("bau", "n_agents")
         kappa = indicators.kappa_g_per_kwh(ref_co2, co2, ref_gwh, gwh)
         self.assertAlmostEqual(np.nanmin(kappa), 295, delta=1)
         self.assertAlmostEqual(np.nanmax(kappa), 2158, delta=1)
         self.assertAlmostEqual(indicators.top_share(co2, 5), 0.282, places=3)
         self.assertEqual(indicators.fsas_for_half(co2), 12)
-        city = indicators.citywide_summary(co2.sum(), gwh.sum(), col("BAU", "n_ev").sum(), col("BAU", "n_vehicles").sum(), agents.sum(),
+        city = indicators.citywide_summary(co2.sum(), gwh.sum(), col("bau", "n_ev").sum(), col("bau", "n_vehicles").sum(), agents.sum(),
                                            {"co2_kt": ref_co2.sum(), "electricity_gwh": ref_gwh.sum()})
         self.assertAlmostEqual(city["kappa_g_per_kwh"], 1012.0, delta=0.5)
         self.assertAlmostEqual(city["load_mw"]["4"], 344.1, delta=0.1)
         r = indicators.pearson(
-            indicators.co2_per_agent_kg(ref_co2, agents), indicators.ev_share(col("BAU", "n_ev"), col("BAU", "n_vehicles"))
+            indicators.co2_per_agent_kg(ref_co2, agents), indicators.ev_share(col("bau", "n_ev"), col("bau", "n_vehicles"))
         )
         self.assertAlmostEqual(r["r"], -0.06, delta=0.01)
 

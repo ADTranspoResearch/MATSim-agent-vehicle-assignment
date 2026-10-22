@@ -69,3 +69,7 @@ Tests: `python3 -m unittest discover -s tests`.
 Default paths are stored in `platform_gui/default_config.json`. Changes saved
 from the GUI are written to `platform_gui/config.json`, which is intentionally
 kept separate from the default template.
+
+Scenario identifiers are `bau`, `acc_adopt`, `del_adopt`, and `pol_align`. Assigned vehicle
+files use `vehicles_<year>_<scenario>_seed<seed>.xml` in the GUI (for example,
+`vehicles_2035_bau_seed1.xml`) and `vehicles_<year>_<scenario>.xml` in the CLI.

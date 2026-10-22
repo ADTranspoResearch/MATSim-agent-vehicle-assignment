@@ -21,7 +21,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 
-DEFAULT_SCENARIO = "BAU"
+DEFAULT_SCENARIO = "bau"
 DEFAULT_FSA = "H0H"
 START_YEAR = 2021
 END_YEAR = 2040
@@ -423,7 +423,7 @@ def main() -> int:
         raise ValueError("Fleet mix and new-vehicle mix use different year ranges.")
 
     year_range = f"{args.start_year}_{args.end_year}"
-    scenario_label = args.scenario.upper()
+    scenario_label = args.scenario
     new_vehicle_output = (
         output_dir / f"qcity_new_vehicle_market_share_{year_range}_{scenario_label}.png"
     )

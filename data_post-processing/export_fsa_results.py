@@ -26,25 +26,25 @@ SAMPLE_EXPANSION_FACTOR = 10
 DAYS_PER_YEAR = 365
 
 SCENARIOS = [
-    ("2020", "REF", "REF2020", PROJECT_ROOT / "output" / "vehicles_updated_2020_REF.xml"),
-    ("2035", "BAU", "BAU", PROJECT_ROOT / "output" / "vehicles_updated_2035_BAU.xml"),
+    ("2020", "REF", "REF2020", PROJECT_ROOT / "output" / "vehicles_2020_REF.xml"),
+    ("2035", "bau", "bau", PROJECT_ROOT / "output" / "vehicles_2035_bau.xml"),
     (
         "2035",
-        "ACCELERATED_ADOPTION",
+        "acc_adopt",
         "ACCEL",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_ACCELERATED_ADOPTION.xml",
+        PROJECT_ROOT / "output" / "vehicles_2035_acc_adopt.xml",
     ),
     (
         "2035",
-        "DELAYED_ADOPTION",
+        "del_adopt",
         "DELAYED",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_DELAYED_ADOPTION.xml",
+        PROJECT_ROOT / "output" / "vehicles_2035_del_adopt.xml",
     ),
     (
         "2035",
-        "POLICY_ALIGNED",
+        "pol_align",
         "POLICY",
-        PROJECT_ROOT / "output" / "vehicles_updated_2035_POLICY_ALIGNED.xml",
+        PROJECT_ROOT / "output" / "vehicles_2035_pol_align.xml",
     ),
 ]
 

@@ -42,7 +42,7 @@ total_fleet = pd.DataFrame()
 # {"H0H"}: PC representing the whole province, used for province-level prediction
 # Q0Q: PC representing the whole city, used for city-level prediction
 
-for fsa_code in {"H0H"}:
+for fsa_code in {"G7A"}:
     print(f"-------------Prediction for {fsa_code} starts-------------")
     historic_pop = main(fsa_code)
 
@@ -103,7 +103,7 @@ for fsa_code in {"H0H"}:
 
     # Predicted composition of newly registered vehicles
     pred_new_veh_mix = predict_composition_trend(
-        initial_composition, avg_type_growth, end_year=2051
+        initial_composition, avg_type_growth, end_year=2041
     )
     
 

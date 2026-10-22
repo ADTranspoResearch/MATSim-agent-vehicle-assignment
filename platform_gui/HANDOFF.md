@@ -65,7 +65,7 @@ events, and each FSA gets a scale factor. The result matches those runs within
 - Numbers from the Policy and Priorities tabs on mock data are not results.
   The paper's `[X]%` needs the real agent table.
 - Not built: run manifest (scenario and vehicle file still picked separately in
-  Pipeline), Gompertz vs recalibrated BAU switch, LISA clusters, census join
+  Pipeline), Gompertz vs recalibrated bau switch, LISA clusters, census join
   for the equity check, cost per tonne, SVG export.
 - Density uses shapefile land area, about 5% below the paper's geometry area.
 - Run Emission Module still needs Maven and the `matsim-emissions` checkout.

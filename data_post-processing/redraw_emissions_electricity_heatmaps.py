@@ -17,10 +17,10 @@ FSA_SHAPEFILE = PROJECT_ROOT / "data" / "FSA" / "quebec_fsa" / "quebec_fsa.shp"
 
 SCENARIOS = [
     ("2020", "REF"),
-    ("2035", "BAU"),
-    ("2035", "DELAYED_ADOPTION"),
-    ("2035", "POLICY_ALIGNED"),
-    ("2035", "ACCELERATED_ADOPTION"),
+    ("2035", "bau"),
+    ("2035", "del_adopt"),
+    ("2035", "pol_align"),
+    ("2035", "acc_adopt"),
 ]
 
 CO2_2020_STOPS = [

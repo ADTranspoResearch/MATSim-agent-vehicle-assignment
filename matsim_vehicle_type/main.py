@@ -235,7 +235,7 @@ def assign_matsim_users_vehicle_type(scenario_year=SCN_YEAR, scenario_type="hist
 
     ET.register_namespace("", "http://www.matsim.org/files/dtd")
     tree = ET.ElementTree(root)
-    output_path = OUTPUT_DIR / f"vehicles_updated_{SCN_YEAR}_{SCN_CASE}.xml"
+    output_path = OUTPUT_DIR / f"vehicles_{SCN_YEAR}_{SCN_CASE}.xml"
     tree.write(
         output_path,
         encoding="utf-8",

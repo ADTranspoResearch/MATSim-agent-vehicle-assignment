@@ -17,7 +17,7 @@ def calculate_vehicle_per_person(pop: int, fleet_size: int) -> float:
 def get_historic_fleet_size(fsa_code:str) -> pd.DataFrame:
     """
     Reads each yearly personal vehicle SAAQ data fuke and returns a df
-    containing every row for each year.
+    with fleet counts for each year, excluding vehicles older than 15 years.
 
     Returns
     -------
@@ -47,6 +47,7 @@ def get_historic_fleet_size(fsa_code:str) -> pd.DataFrame:
                 df_year = df_year.loc[df_year['RTA'].isin(PC_QC)].copy()
             else:  
                 df_year = df_year.loc[df_year['RTA'] == fsa_code].copy()
+
 
             rows.append(
                 {

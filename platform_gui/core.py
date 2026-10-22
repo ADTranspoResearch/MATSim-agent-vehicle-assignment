@@ -39,7 +39,7 @@ URBAN_RIGHT_CROP_RATIO = -0.12
 COLOR_GAMMA = 0.55
 MAP_SIMPLIFICATION_TOLERANCE = 100.0
 CUSTOM_ADOPTION_SCENARIO = "CUSTOM_ADOPTION"
-CUSTOM_ADOPTION_BASE_SCENARIO = "BAU"
+CUSTOM_ADOPTION_BASE_SCENARIO = "bau"
 URBAN_FOCUS_FSA_CODES = {
     "G1B",
     "G1C",
@@ -621,7 +621,7 @@ def list_assignment_vehicle_files(config: dict[str, Any]) -> list[dict[str, Any]
     output_dir = resolve_path(config["output_dir"])
     files = [
         path
-        for path in output_dir.glob("vehicles_updated*.xml*")
+        for path in output_dir.glob("vehicles_*.xml*")
         if path.is_file() and not path.name.endswith(".tmp")
     ]
     files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
@@ -775,7 +775,7 @@ def assign_vehicle_types(
     if output_name:
         output_file = output_dir / output_name
     else:
-        output_file = output_dir / f"vehicles_updated_{year}_{scenario_label}{factor_label}_seed{seed}.xml"
+        output_file = output_dir / f"vehicles_{year}_{scenario_label}{factor_label}_seed{seed}.xml"
 
     report_progress(progress, 4, 4, "Writing assigned vehicle file")
     ET.register_namespace("", "http://www.matsim.org/files/dtd")

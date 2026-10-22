@@ -164,8 +164,8 @@ class WhatIfEngine:
             historical[0]["key"] if historical else None,
         )
         self.base_key = (
-            f"{SCENARIO_YEAR}_BAU"
-            if f"{SCENARIO_YEAR}_BAU" in by_key
+            f"{SCENARIO_YEAR}_bau"
+            if f"{SCENARIO_YEAR}_bau" in by_key
             else next(item["key"] for item in self.scenarios if item["source"] == "predicted")
         )
 
@@ -215,7 +215,7 @@ class WhatIfEngine:
         try:
             bev = ev_module.read_historical_shares(paths["bev"], 2024)
             self.rate = np.array(
-                [ev_module.KWH_PER_KM_BY_TYPE[ev_module.assign_vehicle_type(pid, "BAU", bev)] for pid in self.ids]
+                [ev_module.KWH_PER_KM_BY_TYPE[ev_module.assign_vehicle_type(pid, "bau", bev)] for pid in self.ids]
             )
         except (OSError, KeyError, ValueError) as error:
             self.notes.append(f"EV consumption rates fell back to 0.22 kWh/km ({error}).")
