@@ -2,6 +2,16 @@
 Module used for assigning vehicle make/model/year/type to agents of the
 output of a MATSim simulation based on demographic and locational
 variables.  
+
+## 100% scenario batch scripts
+
+`scripts/run_scenario_batch.py` prepares the 100% inputs, assigns vehicle types,
+runs the offline emission module, and exports daily FSA CO2/electricity totals
+and per-EV metrics for 2020 REF plus four 2035 scenarios, seeds 1–5. It supports
+staged execution and resuming, and computes replicate means and sample standard
+deviations. The batch and its tests have **not been run** as part of this change.
+See [the batch usage guide](docs/scenario_batch_zh.md) and `requirements-batch.txt`.
+
   
 
 ## MATSim data

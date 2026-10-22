@@ -526,11 +526,15 @@ def predict_composition_trend(
     average_growth: dict[float],
     start_year=2021,
     end_year=2030,
+    scenario=None,
 ) -> pd.DataFrame:
     """
     Takes an initial fleet composition and predicts the changes to the
     composition year by year for the specified number of years.
     Returns a Dataframe with the yearly compositions
+
+    ``scenario`` overrides SCN_CASE for this call without changing global
+    configuration; omitting it preserves the existing caller behavior.
     """
     df_rows = {}
     new_share = initial_composition
@@ -558,8 +562,9 @@ def predict_composition_trend(
     df = pd.DataFrame.from_dict(df_rows)
     df = refit_ev_with_gompertz(initial_composition, df)
 
-    if SCN_CASE in SCN_CONFIGS:
-        cfg = SCN_CONFIGS[SCN_CASE]
+    scenario = SCN_CASE if scenario is None else scenario
+    if scenario in SCN_CONFIGS:
+        cfg = SCN_CONFIGS[scenario]
         prefix = cfg["file_prefix"]
         
         if cfg["type"] != "none":

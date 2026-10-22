@@ -16,6 +16,11 @@ def main(fsa_codes):
     pop_filname = f"fsa_projected_pop/{fsa_codes}_projected_pop.csv"  
 
     historic_pop = read_historic_population(pop_filname)
+    return project_fleet_controls(fleet_size, historic_pop)
+
+
+def project_fleet_controls(fleet_size, historic_pop):
+    """Apply the production ownership/population equations to explicit inputs."""
     historic_pop = historic_pop.merge(
         fleet_size, how="left", left_index=True, right_on="year"
     )

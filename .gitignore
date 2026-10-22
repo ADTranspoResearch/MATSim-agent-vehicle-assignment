@@ -22,6 +22,7 @@ platform_gui/config.json
 .codex_render_methodology/
 data_post-processing/results/
 output/*.xml
+/output/batch_100/
 
 # Local independent Gompertz experiments (code, dependencies, tests, and results).
 /matsim_vehicle_type/fleet/gompertz.py

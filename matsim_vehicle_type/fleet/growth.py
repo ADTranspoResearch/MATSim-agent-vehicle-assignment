@@ -89,7 +89,9 @@ def predict_fleet_over_time(
     historic_fleet: pd.DataFrame,
     historic_population: pd.DataFrame,
     predicted_composition: pd.DataFrame,
-    fsa_code: str
+    fsa_code: str,
+    write_outputs: bool = True,
+    scenario=None,
 ) -> pd.DataFrame:
     """
     Takes historic fleet, predicted growth, new vehicle composition, and
@@ -121,6 +123,9 @@ def predict_fleet_over_time(
     pd.DataFrame
         Provides the number of vehicles of each vehicle type (row) for
         every simulated year (column), also saves it to a file.
+
+    Set ``write_outputs=False`` to return the stock without appending production
+    share CSVs. ``scenario`` optionally overrides the output filename suffix.
     """
     # Predict fleet change over time
     combined_fleet = pd.concat(historic_fleet, ignore_index=True)
@@ -128,7 +133,6 @@ def predict_fleet_over_time(
         index="vehicle_type", columns="AnneeSAAQ", values="count"
     )
     df_result = df_result.fillna(0).astype(int)  
-    print(df_result[2019])
 
     # Ensure prediction years are sorted numerically
     prediction_years = sorted(predicted_composition.columns)
@@ -225,6 +229,9 @@ def predict_fleet_over_time(
         df_result[year] = new_totals
 
 
+    if not write_outputs:
+        return df_result
+    scenario = SCN_CASE if scenario is None else scenario
     percentages = df_result.div(df_result.sum(axis=0), axis=1)
     for year in percentages.columns:
         output_df = pd.DataFrame(
@@ -232,7 +239,7 @@ def predict_fleet_over_time(
             index=[fsa_code],
             columns=percentages.index
         )
-        output_path = DATA_DIR / "vehicles" / "predicted_share"/ f"fsa_vehicle_share_{year}_{SCN_CASE}.csv"
+        output_path = DATA_DIR / "vehicles" / "predicted_share"/ f"fsa_vehicle_share_{year}_{scenario}.csv"
         if output_path.exists():
             output_df.to_csv(output_path, mode='a', header=False)
         else:
