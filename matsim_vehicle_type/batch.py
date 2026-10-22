@@ -7,7 +7,7 @@ the chosen batch directory; GUI settings and production share files are untouche
 
 from __future__ import annotations
 
-import fcntl
+import errno
 import gzip
 import hashlib
 import importlib.metadata
@@ -643,19 +643,38 @@ def input_manifest(options: BatchOptions):
                           ("numpy", "pandas", "geopandas", "shapely", "pyarrow")}}
 
 
+def _file_lock(stream, *, unlock: bool = False) -> None:
+    """Select a native, nonblocking lock without importing foreign OS modules."""
+    if os.name == "nt":
+        import msvcrt
+
+        # Windows locks a byte range at the current position. Both operations
+        # must use the same byte; locking beyond EOF also works for an empty file.
+        stream.seek(0)
+        mode = msvcrt.LK_UNLCK if unlock else msvcrt.LK_NBLCK
+        msvcrt.locking(stream.fileno(), mode, 1)
+    else:
+        import fcntl
+
+        mode = fcntl.LOCK_UN if unlock else fcntl.LOCK_EX | fcntl.LOCK_NB
+        fcntl.flock(stream.fileno(), mode)
+
+
 @contextmanager
 def batch_lock(directory: Path):
-    """Do not let two processes overwrite or clean up the same experiment."""
+    """Prevent concurrent batches on Windows, macOS and Linux."""
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory / ".batch.lock").open("a") as stream:
+    with (directory / ".batch.lock").open("a+b") as stream:
         try:
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as error:
+            _file_lock(stream)
+        except OSError as error:
+            if error.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK) and getattr(error, "winerror", None) != 33:
+                raise
             raise RuntimeError(f"Another process is using batch directory {directory}") from error
         try:
             yield
         finally:
-            fcntl.flock(stream, fcntl.LOCK_UN)
+            _file_lock(stream, unlock=True)
 
 
 def run_batch(options: BatchOptions) -> None:

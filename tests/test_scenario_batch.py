@@ -3,14 +3,17 @@
 The real Java integration test is opt-in via RUN_MATSIM_BATCH_INTEGRATION=1.
 """
 
+import errno
 import gzip
 import math
 import os
+import sys
 import tempfile
+import types
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -40,6 +43,37 @@ class BatchTests(unittest.TestCase):
     def distribution(self):
         return {"shares": {"G1B": batch.checked_shares({"electric": 0.5, "ice_sedan": 0.5})},
                 "city_average": batch.checked_shares({"electric": 1.0})}
+
+    def test_native_batch_lock_exclusion_and_release_after_exception(self):
+        directory = self.root / "batch"
+        with self.assertRaisesRegex(ValueError, "body failed"):
+            with batch.batch_lock(directory):
+                with self.assertRaisesRegex(RuntimeError, "Another process"):
+                    with batch.batch_lock(directory):
+                        self.fail("A second batch acquired an occupied lock")
+                raise ValueError("body failed")
+        # Failed batch bodies must release their lock for a later retry.
+        with batch.batch_lock(directory):
+            pass
+
+    def test_windows_file_lock_does_not_require_fcntl(self):
+        calls = []
+        stream = Mock()
+        stream.fileno.return_value = 123
+        stream.seek.side_effect = lambda position: calls.append(("seek", position))
+        windows = types.SimpleNamespace(LK_NBLCK=2, LK_UNLCK=0,
+            locking=lambda fd, mode, size: calls.append(("locking", fd, mode, size)))
+        with patch.object(batch.os, "name", "nt"), patch.dict(sys.modules, {"msvcrt": windows, "fcntl": None}):
+            batch._file_lock(stream)
+            batch._file_lock(stream, unlock=True)
+        self.assertEqual(calls, [("seek", 0), ("locking", 123, 2, 1), ("seek", 0), ("locking", 123, 0, 1)])
+
+    def test_lock_system_errors_are_not_reported_as_another_batch(self):
+        with patch.object(batch, "_file_lock", side_effect=OSError(errno.EIO, "I/O failure")):
+            with self.assertRaises(OSError) as raised:
+                with batch.batch_lock(self.root / "batch"):
+                    self.fail("Lock acquisition should fail")
+        self.assertEqual(raised.exception.errno, errno.EIO)
 
     def test_seed_reproducibility_and_stable_input_order(self):
         base = self.base()

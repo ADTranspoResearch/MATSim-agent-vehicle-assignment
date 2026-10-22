@@ -41,6 +41,7 @@ python3 scripts/run_scenario_batch.py --output-dir /path/to/batch_100 --java-hea
 `--stage summarize` 只处理现有的、通过阶段记录验证的 emission events，不调用 Java；已完成的汇总可直接复用。`--no-resume` 强制重算当前选择的阶段。`--keep-emission-events` 保留新生成的原始排放事件，需要足够空间；已经清理的历史事件不会因为添加此参数自动恢复。
 
 每个路径都可通过命令行覆盖，具体参数见 `--help`。同一个输出目录只允许一个批处理进程。
+文件锁自动选择 Windows 内置 `msvcrt` 或 macOS/Linux 内置 `fcntl`，无需安装额外的锁依赖。
 
 ## 指标定义
 
@@ -111,4 +112,4 @@ python3 -m unittest discover -s tests -p 'test_scenario_batch.py'
 RUN_MATSIM_BATCH_INTEGRATION=1 python3 -m unittest discover -s tests -p 'test_scenario_batch.py'
 ```
 
-测试覆盖重复 seed、排序稳定性、公交元数据、缺失 FSA、驾驶员映射、零 EV、零里程 EV、日单位、warm/cold 汇总、样本标准差、事件清理后的恢复，以及正式模型显式情境参数的兼容性。
+测试覆盖重复 seed、排序稳定性、公交元数据、缺失 FSA、驾驶员映射、零 EV、零里程 EV、日单位、warm/cold 汇总、样本标准差、事件清理后的恢复、Windows 文件锁选择、并发互斥与异常后释放，以及正式模型显式情境参数的兼容性。
