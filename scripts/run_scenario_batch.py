@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the 100% MATSim daily FSA experiment matrix (25 runs by default)."""
+"""Run the 100% MATSim daily FSA experiment matrix (50 runs by default)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def parser():
     paths = {
         "events": "data/MATSim/events/output_events_100.xml.gz",
         "vehicles": "data/MATSim/vehicles/output_allVehicles_with_events_100_ids.xml.gz",
-        "network": "data/MATSim/network/network_0409.xml",
+        "network": "data/MATSim/network/QC_network_fixed_1022.xml",
         "fsa-lookup": "data/FSA/agent_id_fsa_table.csv",
         "fsa-shapes": "data/FSA/quebec_fsa/quebec_fsa.shp",
         "ownership-dir": "data/vehicles/ownership/personal_ownership",
@@ -26,13 +26,13 @@ def parser():
         "reference-shares": "data/vehicles/fsa_vehicle_share_2020.parquet",
         "bev-shares": "data_post-processing/results/battery_electric_vehicle_type_share_quebec.csv",
         "emission-module": "matsim-emissions",
-        "output-dir": "output/batch_100",
+        "output-dir": "output/batch_100_10seeds",
     }
     for name, default in paths.items():
         result.add_argument(f"--{name}", type=Path, default=root / default)
     result.add_argument("--scenarios", nargs="+", choices=["2020_REF", "2035_bau", "2035_acc_adopt", "2035_del_adopt", "2035_pol_align"],
                         default=["2020_REF", "2035_bau", "2035_acc_adopt", "2035_del_adopt", "2035_pol_align"])
-    result.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3, 4, 5])
+    result.add_argument("--seeds", nargs="+", type=int, default=list(range(1, 11)))
     result.add_argument("--stage", choices=["all", "prepare", "assign", "summarize"], default="all",
                         help="prepare: cache inputs; assign: also write vehicles; summarize: use existing emission dumps")
     result.add_argument("--coordinates-crs", default="EPSG:32187")
@@ -58,6 +58,7 @@ def main(argv=None):
     if args.dry_run:
         print(f"Events: {args.events.resolve()}")
         print(f"Vehicles: {args.vehicles.resolve()}")
+        print(f"Network: {args.network.resolve()}")
         print(f"Output: {args.output_dir.resolve()}")
         print(f"Stage: {args.stage}; expansion factor: 1; daily results only")
         for scenario in args.scenarios:

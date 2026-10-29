@@ -23,6 +23,7 @@ platform_gui/config.json
 data_post-processing/results/
 output/*.xml
 /output/batch_100/
+/output/batch_100_10seeds/
 
 # Local independent Gompertz experiments (code, dependencies, tests, and results).
 /matsim_vehicle_type/fleet/gompertz.py

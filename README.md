@@ -7,7 +7,12 @@ variables.
 
 `scripts/run_scenario_batch.py` prepares the 100% inputs, assigns vehicle types,
 runs the offline emission module, and exports daily FSA CO2/electricity totals
-and per-EV metrics for 2020 REF plus four 2035 scenarios, seeds 1–5. It supports
+and per-EV metrics for 2020 REF plus four 2035 scenarios, seeds 1–10 (50 runs).
+Each run also saves vehicle-level warm/cold/total CO2, daily distance and
+electricity, and full-network link-level warm/cold/total CO2 in compressed
+Parquet tables. Defaults use the 100% events/vehicles, the corrected network,
+and the current All-prediction Gompertz model. Outputs go to
+`output/batch_100_10seeds/`. It supports
 staged execution and resuming, and computes replicate means and sample standard
 deviations. The batch and its tests have **not been run** as part of this change.
 See [the batch usage guide](docs/scenario_batch_zh.md) and `requirements-batch.txt`.

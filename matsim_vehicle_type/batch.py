@@ -46,15 +46,20 @@ FSA_PATTERN = re.compile(r"^[A-Z][0-9][A-Z]$")
 METRICS = (
     "vehicle_count", "ev_count", "active_ev_count", "total_co2_kg_per_day",
     "co2_kg_per_ev_per_day", "total_electricity_kwh_per_day", "electricity_kwh_per_ev_per_day",
+    "total_distance_km_per_day",
 )
-SCHEMA_VERSION = 1
+DEFAULT_SEEDS = tuple(range(1, 11))
+PREDICTION_MODEL = "all_prediction_gompertz"
+GOMPERTZ_FIT_END_YEAR = 2040
+SCHEMA_VERSION = 2
+CO2_COLUMNS = ("warm_co2_kg_per_day", "cold_co2_kg_per_day", "co2_kg_per_day")
 
 
 @dataclass
 class BatchOptions:
     events: Path = ROOT / "data/MATSim/events/output_events_100.xml.gz"
     vehicles: Path = ROOT / "data/MATSim/vehicles/output_allVehicles_with_events_100_ids.xml.gz"
-    network: Path = ROOT / "data/MATSim/network/network_0409.xml"
+    network: Path = ROOT / "data/MATSim/network/QC_network_fixed_1022.xml"
     fsa_lookup: Path = ROOT / "data/FSA/agent_id_fsa_table.csv"
     fsa_shapes: Path = ROOT / "data/FSA/quebec_fsa/quebec_fsa.shp"
     ownership_dir: Path = ROOT / "data/vehicles/ownership/personal_ownership"
@@ -62,9 +67,9 @@ class BatchOptions:
     reference_shares: Path = ROOT / "data/vehicles/fsa_vehicle_share_2020.parquet"
     bev_shares: Path = ROOT / "data_post-processing/results/battery_electric_vehicle_type_share_quebec.csv"
     emission_module: Path = ROOT / "matsim-emissions"
-    output_dir: Path = ROOT / "output/batch_100"
+    output_dir: Path = ROOT / "output/batch_100_10seeds"
     scenarios: tuple[str, ...] = SCENARIOS
-    seeds: tuple[int, ...] = (1, 2, 3, 4, 5)
+    seeds: tuple[int, ...] = DEFAULT_SEEDS
     coordinates_crs: str = "EPSG:32187"
     resume: bool = True
     keep_emission_events: bool = False
@@ -79,6 +84,15 @@ class BatchOptions:
     @property
     def factor_dir(self):
         return self.emission_module / "QC_input_data/emission_factor_table"
+
+
+@dataclass
+class EmissionSummary:
+    """Non-bus CO2 grams, indexed by vehicle/link; values are [warm, cold]."""
+
+    vehicle_grams: dict[str, list[float]]
+    link_grams: dict[str, list[float]]
+    counts: dict[str, int]
 
 
 def log(message: str) -> None:
@@ -96,7 +110,7 @@ def write_frame(path: Path, frame: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.stem + ".tmp" + path.suffix)
     if path.suffix == ".parquet":
-        frame.to_parquet(temporary, index=False)
+        frame.to_parquet(temporary, index=False, engine="pyarrow", compression="snappy")
     else:
         frame.to_csv(temporary, index=False, float_format="%.12g")
     temporary.replace(path)
@@ -258,16 +272,13 @@ def locate_homes(homes: dict[str, tuple[float, float]], shapes_path: Path, crs: 
     return result, {"spatial_unmatched_persons": len(homes) - len(result), "boundary_ambiguous_persons": ambiguous}
 
 
-def prepare_mobility(options: BatchOptions, cache: Path, key: str, ev_module):
+def prepare_mobility(options: BatchOptions, cache: Path, key: str, lengths: dict[str, float]):
     marker, output = cache / "mobility.done.json", cache / "vehicles.parquet"
     personal, buses = read_vehicle_inventory(options.vehicles)
     if completed_stage(marker, key, options.resume):
         log("Reusing validated mobility cache")
         return pd.read_parquet(output), buses
     log("Scanning 100% events once for homes, drivers and vehicle distances")
-    lengths = ev_module.read_link_lengths(options.network)
-    if not lengths or any(not math.isfinite(v) or v < 0 for v in lengths.values()):
-        raise ValueError("Network link lengths must be finite, nonnegative, and nonempty.")
     homes, drivers, metres, diagnostics = scan_mobility(options.events, set(personal), buses, lengths)
     home_fsa, spatial_diagnostics = locate_homes(homes, options.fsa_shapes, options.coordinates_crs)
     lookup = core.read_fsa_lookup(options.fsa_lookup)
@@ -348,6 +359,35 @@ def checked_shares(values: dict[str, float]) -> dict[str, float]:
     return dict(zip(CATEGORIES, map(float, array)))
 
 
+def validate_prediction_audit(prediction: pd.DataFrame, scenario: str) -> dict:
+    """Require evidence from the actual fit, not just a manifest model label."""
+    audit = prediction.attrs.get("gompertz", {})
+    baseline = audit.get("baseline_fit") or {}
+    expected_years = list(range(2021, GOMPERTZ_FIT_END_YEAR + 1))
+    if (audit.get("model") != PREDICTION_MODEL or audit.get("scenario") != scenario
+            or audit.get("fit_end_year") != GOMPERTZ_FIT_END_YEAR
+            or baseline.get("anchor_year") != 2020
+            or list(baseline.get("fit_years", [])) != expected_years
+            or [row["year"] for row in audit.get("baseline_targets", [])] != expected_years):
+        raise ValueError("Prediction is not the required 2021-2040 All-prediction Gompertz fit")
+    fits = [baseline]
+    if scenario in ("acc_adopt", "del_adopt"):
+        fitted = audit.get("scenario_fit") or {}
+        years = list(range(2025, GOMPERTZ_FIT_END_YEAR + 1))
+        factor = 1.25 if scenario == "acc_adopt" else 0.75
+        if (audit.get("scenario_factor") != factor or fitted.get("anchor_year") != 2024
+                or list(fitted.get("fit_years", [])) != years
+                or [row["year"] for row in audit.get("scenario_targets", [])] != years):
+            raise ValueError(f"{scenario} must fit all scaled 2025-2040 targets from the BAU 2024 anchor")
+        fits.append(fitted)
+    for fit in fits:
+        if any(not math.isfinite(float(fit.get(name, math.nan))) or float(fit[name]) <= 0 for name in ("a", "k")):
+            raise ValueError("Gompertz fit must have finite positive a and k parameters")
+        if not 0 < float(fit.get("anchor_share", math.nan)) < 1:
+            raise ValueError("Gompertz fit has an invalid observed/BAU anchor share")
+    return deepcopy(audit)
+
+
 def build_distributions(options: BatchOptions, base: pd.DataFrame, cache: Path, key: str):
     output, marker = cache / "distributions.json", cache / "distributions.done.json"
     if completed_stage(marker, key, options.resume):
@@ -356,7 +396,7 @@ def build_distributions(options: BatchOptions, base: pd.DataFrame, cache: Path, 
     counts, raw_totals = aggregate_history(options, fsas, cache, key)
     reference = core.read_vehicle_distribution(options.reference_shares)
     result = {label: {"shares": {}, "fleet_sizes": {}, "fallback_reasons": {}} for label in SCENARIOS}
-    diagnostics = []
+    diagnostics, fits = [], []
     for fsa in sorted(fsas):
         history = counts.loc[counts.fsa.eq(fsa)]
         ref_size = float(history.loc[history.year.eq(2020), "fleet_count"].sum())
@@ -397,7 +437,12 @@ def build_distributions(options: BatchOptions, base: pd.DataFrame, cache: Path, 
         for label in SCENARIOS[1:]:
             scenario = label.removeprefix("2035_")
             try:
-                new_mix = composition.predict_composition_trend(initial, trends, start_year=2021, end_year=2041, scenario=scenario)
+                new_mix = composition.predict_composition_trend(
+                    initial, trends, start_year=2021, end_year=2041, scenario=scenario,
+                    gompertz_fit_end_year=GOMPERTZ_FIT_END_YEAR,
+                )
+                audit = validate_prediction_audit(new_mix, scenario)
+                fits.append({"fsa": fsa, "scenario": scenario, **audit})
                 if not np.isfinite(new_mix.to_numpy()).all() or new_mix.lt(0).any().any():
                     raise ValueError("Invalid new-vehicle composition")
                 np.testing.assert_allclose(new_mix.sum(axis=0), 1.0, atol=1e-9)
@@ -406,7 +451,7 @@ def build_distributions(options: BatchOptions, base: pd.DataFrame, cache: Path, 
                 shares = checked_shares(target.to_dict())
                 result[label]["shares"][fsa] = shares
                 result[label]["fleet_sizes"][fsa] = float(target.sum())
-            except (ValueError, KeyError, ZeroDivisionError, OverflowError, AssertionError) as error:
+            except (ValueError, KeyError, ZeroDivisionError, OverflowError, AssertionError, RuntimeError) as error:
                 result[label]["fallback_reasons"][fsa] = str(error)
                 diagnostics.append({"fsa": fsa, "scenario": scenario, "reason": str(error)})
     for label, distribution in result.items():
@@ -420,7 +465,10 @@ def build_distributions(options: BatchOptions, base: pd.DataFrame, cache: Path, 
         distribution["city_average_fleet_size"] = total
     write_json(output, result)
     diagnostics_path = cache / "prediction_diagnostics.json"
-    write_json(diagnostics_path, {"forecast_years": [2021, 2040], "scenario_settings": SCN_CONFIGS, "fallbacks": diagnostics})
+    write_json(diagnostics_path, {"forecast_years": [2021, 2040], "scenario_settings": SCN_CONFIGS,
+                                 "prediction_model": PREDICTION_MODEL,
+                                 "gompertz_fit_end_year": GOMPERTZ_FIT_END_YEAR,
+                                 "fits": fits, "fallbacks": diagnostics})
     save_stage(marker, key, [output, diagnostics_path])
     return result
 
@@ -496,8 +544,9 @@ def write_assigned_vehicles(source: Path, target: Path, assigned: pd.DataFrame) 
     temporary.replace(target)
 
 
-def summarize_emissions(path: Path, personal: set[str], buses: set[str]):
-    grams = defaultdict(float)
+def summarize_emissions(path: Path, personal: set[str], buses: set[str], links: set[str]) -> EmissionSummary:
+    """Aggregate both dimensions in one streaming pass; never retain events."""
+    vehicles, roads = defaultdict(lambda: [0.0, 0.0]), defaultdict(lambda: [0.0, 0.0])
     counts = Counter()
 
     def handle(event):
@@ -510,26 +559,39 @@ def summarize_emissions(path: Path, personal: set[str], buses: set[str]):
             return
         if vehicle not in personal:
             raise ValueError(f"Emission event contains unknown vehicle {vehicle!r}")
+        link = event.get("linkId") or event.get("link")
+        if link not in links:
+            raise ValueError(f"Emission event contains missing/unknown link {link!r} for vehicle {vehicle}")
         if "CO2" not in event:
             raise ValueError(f"CO2 missing from {kind} for {vehicle}")
-        value = float(event["CO2"])
+        try:
+            value = float(event["CO2"])
+        except ValueError as error:
+            raise ValueError(f"Invalid CO2 value for vehicle {vehicle}: {event['CO2']!r}") from error
         if not math.isfinite(value) or value < 0:
             raise ValueError(f"Invalid CO2 value for vehicle {vehicle}: {value}")
-        grams[vehicle] += value
+        component = 0 if kind == "warmEmissionEvent" else 1
+        vehicles[vehicle][component] += value
+        roads[link][component] += value
+        if not math.isfinite(vehicles[vehicle][component]) or not math.isfinite(roads[link][component]):
+            raise ValueError(f"CO2 accumulation overflow for vehicle {vehicle}, link {link}")
         counts[kind] += 1
 
     scan_xml(path, handle)
-    return dict(grams), dict(counts)
+    return EmissionSummary(dict(vehicles), dict(roads), dict(counts))
 
 
-def daily_fsa_results(assigned: pd.DataFrame, grams: dict[str, float], fsas: list[str], year: int, scenario: str, seed: int):
+def daily_fsa_results(assigned: pd.DataFrame, emissions: EmissionSummary, fsas: list[str], year: int, scenario: str, seed: int):
     audit = assigned.copy()
-    audit["co2_kg_per_day"] = audit.vehicle_id.map(grams).fillna(0) / 1000.0
+    for index, column in enumerate(CO2_COLUMNS[:2]):
+        audit[column] = audit.vehicle_id.map({v: amounts[index] for v, amounts in emissions.vehicle_grams.items()}).fillna(0) / 1000.0
+    audit["co2_kg_per_day"] = audit.warm_co2_kg_per_day + audit.cold_co2_kg_per_day
     audit["ev_count"] = audit.vehicle_type.eq("electric").astype(int)
     audit["active_ev_count"] = (audit.vehicle_type.eq("electric") & audit.distance_km_per_day.gt(0)).astype(int)
     result = audit.groupby("fsa").agg(vehicle_count=("vehicle_id", "size"), ev_count=("ev_count", "sum"),
         active_ev_count=("active_ev_count", "sum"), total_co2_kg_per_day=("co2_kg_per_day", "sum"),
-        total_electricity_kwh_per_day=("electricity_kwh_per_day", "sum")).reindex(fsas, fill_value=0)
+        total_electricity_kwh_per_day=("electricity_kwh_per_day", "sum"),
+        total_distance_km_per_day=("distance_km_per_day", "sum")).reindex(fsas, fill_value=0)
     denominator = result.ev_count.replace(0, np.nan)
     result["co2_kg_per_ev_per_day"] = result.total_co2_kg_per_day / denominator
     result["electricity_kwh_per_ev_per_day"] = result.total_electricity_kwh_per_day / denominator
@@ -540,11 +602,98 @@ def daily_fsa_results(assigned: pd.DataFrame, grams: dict[str, float], fsas: lis
     result = result[["year", "scenario", "seed", "fsa", *METRICS]]
     if int(result.vehicle_count.sum()) != len(audit) or int(result.ev_count.sum()) != int(audit.ev_count.sum()):
         raise ValueError("FSA vehicle-count conservation failed")
-    for actual, expected in ((result.total_co2_kg_per_day.sum(), math.fsum(grams.values()) / 1000),
-                             (result.total_electricity_kwh_per_day.sum(), math.fsum(audit.electricity_kwh_per_day))):
+    for actual, expected in ((result.total_co2_kg_per_day.sum(), math.fsum(x for amounts in emissions.vehicle_grams.values() for x in amounts) / 1000),
+                             (result.total_electricity_kwh_per_day.sum(), math.fsum(audit.electricity_kwh_per_day)),
+                             (result.total_distance_km_per_day.sum(), math.fsum(audit.distance_km_per_day))):
         if not math.isclose(actual, expected, rel_tol=1e-10, abs_tol=1e-6):
             raise ValueError(f"FSA total conservation failed: {actual} != {expected}")
-    return result, audit.drop(columns=["ev_count", "active_ev_count"])
+    audit = audit.drop(columns=["ev_count", "active_ev_count"])
+    audit.insert(0, "seed", seed)
+    audit.insert(0, "scenario", scenario)
+    audit.insert(0, "year", year)
+    return result, audit
+
+
+def daily_link_results(emissions: EmissionSummary, links: set[str], year: int, scenario: str, seed: int) -> pd.DataFrame:
+    """Keep the same full-network row set in every replicate, including zeros."""
+    if set(emissions.link_grams) - links:
+        raise ValueError("Emission summary contains links outside the network")
+    frame = pd.DataFrame([(link, *emissions.link_grams.get(link, [0.0, 0.0])) for link in sorted(links)],
+                         columns=["link_id", *CO2_COLUMNS[:2]])
+    frame[list(CO2_COLUMNS[:2])] = frame[list(CO2_COLUMNS[:2])] / 1000.0
+    frame["co2_kg_per_day"] = frame.warm_co2_kg_per_day + frame.cold_co2_kg_per_day
+    frame.insert(0, "seed", seed)
+    frame.insert(0, "scenario", scenario)
+    frame.insert(0, "year", year)
+    return frame
+
+
+def validate_daily_results(fsa: pd.DataFrame, vehicles: pd.DataFrame, links: pd.DataFrame) -> dict[str, float]:
+    """Check both emission components and daily distance before publishing."""
+    for label, frame, id_column in (("vehicle", vehicles, "vehicle_id"), ("link", links, "link_id")):
+        if frame[id_column].duplicated().any():
+            raise ValueError(f"Duplicate {label} rows")
+        values = frame[list(CO2_COLUMNS)].to_numpy(dtype=float)
+        if not np.isfinite(values).all() or (values < 0).any():
+            raise ValueError(f"Invalid {label} CO2 totals")
+        if not np.allclose(values[:, 0] + values[:, 1], values[:, 2], rtol=1e-10, atol=1e-6):
+            raise ValueError(f"{label} warm/cold CO2 conservation failed")
+    for column in CO2_COLUMNS:
+        if not math.isclose(math.fsum(vehicles[column]), math.fsum(links[column]), rel_tol=1e-10, abs_tol=1e-6):
+            raise ValueError(f"Vehicle/link {column} conservation failed")
+    totals = {}
+    for output, column in (("total_co2_kg_per_day", "co2_kg_per_day"),
+                           ("total_distance_km_per_day", "distance_km_per_day"),
+                           ("total_electricity_kwh_per_day", "electricity_kwh_per_day")):
+        values = vehicles[column].to_numpy(dtype=float)
+        fsa_values = fsa[output].to_numpy(dtype=float)
+        if not np.isfinite(values).all() or (values < 0).any() or not np.isfinite(fsa_values).all() or (fsa_values < 0).any():
+            raise ValueError(f"Invalid daily {column} totals")
+        total = math.fsum(values)
+        if not math.isclose(total, math.fsum(fsa_values), rel_tol=1e-10, abs_tol=1e-6):
+            raise ValueError(f"Vehicle/FSA {column} conservation failed")
+        totals[output] = total
+    return totals
+
+
+def saved_table_stats(path: Path, expected_rows: int) -> dict[str, int]:
+    if path.suffix == ".parquet":
+        import pyarrow.parquet as pq
+
+        rows = pq.read_metadata(path).num_rows
+    else:
+        rows = len(pd.read_csv(path))
+    if rows != expected_rows:
+        raise ValueError(f"Written row count mismatch for {path}: {rows} != {expected_rows}")
+    return {"row_count": rows, "size_bytes": path.stat().st_size}
+
+
+def save_run_summary(options: BatchOptions, run_dir: Path, run_key: str, assigned: pd.DataFrame,
+                     emissions: EmissionSummary, links: set[str], fsas: list[str], year: int, scenario: str, seed: int):
+    result, audit = daily_fsa_results(assigned, emissions, fsas, year, scenario, seed)
+    roads = daily_link_results(emissions, links, year, scenario, seed)
+    totals = validate_daily_results(result, audit, roads)
+    files = {"fsa_results.csv": result, "vehicle_results.parquet": audit, "link_results.parquet": roads}
+    statistics = {}
+    for name, frame in files.items():
+        path = run_dir / name
+        write_frame(path, frame)
+        statistics[name] = saved_table_stats(path, len(frame))
+    diagnostics_path = run_dir / "summary_diagnostics.json"
+    write_json(diagnostics_path, {"schema_version": SCHEMA_VERSION, "emission_event_counts": emissions.counts,
+        "vehicle_count": len(audit), "link_count": len(roads), **totals,
+        "warm_co2_kg_per_day": math.fsum(audit.warm_co2_kg_per_day),
+        "cold_co2_kg_per_day": math.fsum(audit.cold_co2_kg_per_day), "files": statistics,
+        "events_input": str(options.events), "vehicles_input": str(options.vehicles), "network_input": str(options.network),
+        "sample_expansion_factor": 1, "annualization": False, "conservation_checks_passed": True})
+    save_stage(run_dir / "summary.done.json", run_key,
+        [*(run_dir / name for name in files), diagnostics_path, run_dir / "assignments.parquet",
+         run_dir / "vehicles.xml.gz", run_dir / "assignment_diagnostics.json", run_dir / "emission_config.xml"],
+        raw_events_cleaned=not options.keep_emission_events)
+    # Neither the marker nor its validity depends on this temporary event dump.
+    if not options.keep_emission_events:
+        (run_dir / "emission/emission.events.offline.xml.gz").unlink()
+    return result
 
 
 def aggregate_replicates(combined: pd.DataFrame) -> pd.DataFrame:
@@ -648,6 +797,7 @@ def input_manifest(options: BatchOptions):
     files.extend(sorted((options.emission_module / "src/main/java").rglob("*.java")))
     files.extend([Path(__file__), ROOT / "scripts/run_scenario_batch.py", ROOT / "matsim_vehicle_type/config.py",
                   ROOT / "matsim_vehicle_type/fleet/composition.py", ROOT / "matsim_vehicle_type/fleet/growth.py",
+                  ROOT / "matsim_vehicle_type/fleet/gompertz_projection.py",
                   ROOT / "matsim_vehicle_type/fleet/main.py", ROOT / "platform_gui/core.py",
                   ROOT / "data_post-processing/summarize_ev_electricity_by_scenario.py",
                   ROOT / "requirements-batch.txt"])
@@ -658,9 +808,13 @@ def input_manifest(options: BatchOptions):
             "coordinate_crs": options.coordinates_crs, "sample_expansion_factor": 1,
             "time_basis": "simulated_day", "scenario_settings": SCN_CONFIGS,
             "forecast_start": 2021, "forecast_end_inclusive": 2040, "city_fsas": sorted(PC_QC),
+            "prediction_model": PREDICTION_MODEL, "gompertz_fit_end_year": GOMPERTZ_FIT_END_YEAR,
+            "emission_aggregation": {"pollutants": ["CO2"], "components": ["warm", "cold"],
+                                     "scope": "non_bus", "units": "kg/day", "link_rows": "full_network",
+                                     "distance_units": "km/day", "parquet_compression": "snappy"},
             "python_version": sys.version,
             "libraries": {name: importlib.metadata.version(name) for name in
-                          ("numpy", "pandas", "geopandas", "shapely", "pyarrow")}}
+                          ("numpy", "pandas", "scipy", "geopandas", "shapely", "pyarrow")}}
 
 
 def _file_lock(stream, *, unlock: bool = False) -> None:
@@ -713,7 +867,12 @@ def _run_batch(options: BatchOptions) -> None:
         raise ValueError("Batch inputs/code changed. Use a fresh --output-dir to keep earlier experiments traceable.")
     write_json(manifest_path, manifest)
     ev_module = core.load_script_module("batch_ev_electricity", ROOT / "data_post-processing/summarize_ev_electricity_by_scenario.py")
-    base, buses = prepare_mobility(options, cache, key, ev_module)
+    log(f"Traffic events: {options.events}; vehicles: {options.vehicles}; expansion factor: 1")
+    lengths = ev_module.read_link_lengths(options.network)
+    if not lengths or any(not math.isfinite(v) or v < 0 for v in lengths.values()):
+        raise ValueError("Network link lengths must be finite, nonnegative, and nonempty.")
+    links = set(lengths)
+    base, buses = prepare_mobility(options, cache, key, lengths)
     distributions = build_distributions(options, base, cache, key)
     fsas = sorted(set(PC_QC) | set(base.fsa) | {"UNKNOWN"})
     if options.stage == "prepare":
@@ -789,21 +948,8 @@ def _run_batch(options: BatchOptions) -> None:
                     if not raw_events.is_file() or raw_events.stat().st_size == 0:
                         raise RuntimeError(f"{run_id}: emission module did not write {raw_events}")
                     save_stage(emission_marker, run_key, [raw_events, config])
-                grams, emission_counts = summarize_emissions(raw_events, set(assigned.vehicle_id), buses)
-                result, audit = daily_fsa_results(assigned, grams, fsas, year, scenario, seed)
-                audit_path, diagnostics_path = run_dir / "vehicle_results.parquet", run_dir / "summary_diagnostics.json"
-                write_frame(table_path, result)
-                write_frame(audit_path, audit)
-                write_json(diagnostics_path, {"emission_event_counts": emission_counts, "vehicle_count": len(audit),
-                    "total_co2_kg_per_day": float(result.total_co2_kg_per_day.sum()),
-                    "total_electricity_kwh_per_day": float(result.total_electricity_kwh_per_day.sum()),
-                    "sample_expansion_factor": 1, "annualization": False, "conservation_checks_passed": True})
-                save_stage(summary_marker, run_key, [table_path, audit_path, diagnostics_path, assignment_path,
-                    assigned_path, run_dir / "assignment_diagnostics.json", run_dir / "emission_config.xml"],
-                    raw_events_cleaned=not options.keep_emission_events)
-                # The summary marker deliberately does not depend on the large dump.
-                if not options.keep_emission_events:
-                    raw_events.unlink()
+                emissions = summarize_emissions(raw_events, set(assigned.vehicle_id), buses, links)
+                result = save_run_summary(options, run_dir, run_key, assigned, emissions, links, fsas, year, scenario, seed)
                 frames.append(result)
                 batch_status["completed"].append(run_id)
                 write_json(status_path, batch_status)
@@ -820,7 +966,8 @@ def _run_batch(options: BatchOptions) -> None:
             write_frame(options.output_dir / "fsa_results_all_seeds.csv", combined)
             write_frame(options.output_dir / "fsa_results_seed_statistics.csv", stats)
             city = combined.groupby(["year", "scenario", "seed"], as_index=False)[
-                ["vehicle_count", "ev_count", "active_ev_count", "total_co2_kg_per_day", "total_electricity_kwh_per_day"]].sum()
+                ["vehicle_count", "ev_count", "active_ev_count", "total_co2_kg_per_day", "total_electricity_kwh_per_day",
+                 "total_distance_km_per_day"]].sum()
             denominator = city.ev_count.replace(0, np.nan)
             city["co2_kg_per_ev_per_day"] = city.total_co2_kg_per_day / denominator
             city["electricity_kwh_per_ev_per_day"] = city.total_electricity_kwh_per_day / denominator

@@ -3,7 +3,7 @@ Contains functions related to prediction the vehicle type composition
 of the new vehicles entering the fleet each year.
 """
 
-from math import e, log10, exp, log
+from math import e, log10, exp, log, isfinite
 from warnings import warn
 import pandas as pd
 # from matsim_vehicle_type.vehicles.vehicle_assignment import get_vehicle_type
@@ -360,10 +360,11 @@ def refit_ev_with_gompertz(
     min_delta: float = 0.005,
 ) -> pd.DataFrame:
     """
-    Refit only EV new-vehicle share with a Gompertz curve.
+    Legacy two-anchor EV Gompertz refit, retained for explicit comparisons.
 
-    2020 comes from initial_composition.
-    2024 and 2035 come from the existing baseline_df.
+    The first anchor comes from initial_composition; the second is the
+    selected first-stage plateau/peak year. The production prediction entry
+    point now uses refit_ev_with_all_predictions instead.
 
     Other vehicle types keep their baseline relative proportions and are
     rescaled to fill 1 - EV share.
@@ -521,68 +522,163 @@ def apply_ev_logit_scenario_from_scaled_target(*args, **kwargs) -> pd.DataFrame:
     """
     return apply_ev_gompertz_scenario_from_scaled_target(*args, **kwargs)
 
-def predict_composition_trend(
-    initial_composition: dict[float],
-    average_growth: dict[float],
+def project_composition_first_stage(
+    initial_composition: dict[str, float],
+    average_growth: dict[str, float],
     start_year=2021,
     end_year=2030,
-    scenario=None,
 ) -> pd.DataFrame:
-    """
-    Takes an initial fleet composition and predicts the changes to the
-    composition year by year for the specified number of years.
-    Returns a Dataframe with the yearly compositions
+    """Run the original recurrence without any curve or scenario adjustment.
 
-    ``scenario`` overrides SCN_CASE for this call without changing global
-    configuration; omitting it preserves the existing caller behavior.
+    ``end_year`` is exclusive, as in ``predict_composition_trend``.
     """
+    if not isinstance(start_year, int) or not isinstance(end_year, int) or end_year <= start_year:
+        raise ValueError("The first-stage interval must contain integer forecast years.")
+    if not initial_composition or any(not isfinite(value) or value < 0 for value in initial_composition.values()):
+        raise ValueError("Initial shares must be finite and nonnegative.")
+    if abs(sum(initial_composition.values()) - 1) > 1e-9:
+        raise ValueError("Initial composition must sum to one.")
+    if any(key not in average_growth or not isfinite(average_growth[key]) for key in initial_composition):
+        raise ValueError("Each initial vehicle type requires a finite historical growth rate.")
     df_rows = {}
     new_share = initial_composition
     for i in range(start_year, end_year):
-        row = {}
         growth_weight = {}
-        for vehicle_type, market_share in initial_composition.items():
-            if vehicle_type in {"electric"}:
+        for vehicle_type in initial_composition:
+            if vehicle_type == "electric":
                 current_ev_share = new_share[vehicle_type]
-
                 max_growth = average_growth[vehicle_type]
-                # if i <= 2024:
-                #     growth_weight[vehicle_type] = 1 + (
-                #         max_growth
-                #     )
-                # else:
-                growth_weight[vehicle_type] = 1 + (
-                    max_growth  * (1 - current_ev_share)
-                )
-
+                growth_weight[vehicle_type] = 1 + max_growth * (1 - current_ev_share)
             else:
                 growth_weight[vehicle_type] = average_growth[vehicle_type] + 1
         new_share = multiply_reweight(new_share, growth_weight)
         df_rows[i] = new_share
-    df = pd.DataFrame.from_dict(df_rows)
-    df = refit_ev_with_gompertz(initial_composition, df)
+    return pd.DataFrame.from_dict(df_rows)
+
+
+def refit_ev_with_all_predictions(initial_composition, first_stage_df, fit_end_year=2040):
+    """Fit all first-stage EV targets up to a fixed, inclusive calibration end."""
+    from matsim_vehicle_type.fleet.gompertz_projection import fit_projected_ev_gompertz, replace_ev_shares
+
+    fit_years = [int(year) for year in first_stage_df.columns if year <= fit_end_year]
+    anchor_year = int(min(first_stage_df.columns)) - 1
+    fit = fit_projected_ev_gompertz(
+        fit_years, first_stage_df.loc["electric", fit_years], anchor_year, initial_composition["electric"]
+    )
+    result = replace_ev_shares(first_stage_df, fit.predict(first_stage_df.columns))
+    result.attrs["gompertz"] = {
+        "model": "all_prediction_gompertz", "fit_end_year": fit_end_year,
+        "baseline_fit": fit.to_dict(),
+        "baseline_targets": [{"year": year, "target_share": float(first_stage_df.loc["electric", year])}
+                             for year in fit_years],
+        "scenario_fit": None, "scenario_targets": [], "clipped_target_count": 0,
+    }
+    return result
+
+
+def apply_ev_gompertz_scenario_from_scaled_predictions(
+    baseline_df, first_stage_df, *, anchor_year=2024, factor=1.25, fit_end_year=2040, ceiling=1.0,
+):
+    """Fit scaled raw EV targets after a shared BAU anchor, with fixed K=1.
+
+    The factor scales the first-stage shares, not annual growth rates or the
+    fitted BAU. Targets are clipped to [0, 1]; clipping is exposed in attrs.
+    """
+    from copy import deepcopy
+    from matsim_vehicle_type.fleet.gompertz_projection import fit_projected_ev_gompertz, replace_ev_shares
+
+    if not isfinite(factor) or factor <= 0:
+        raise ValueError("The projection scaling factor must be positive and finite.")
+    if ceiling != 1.0:
+        raise ValueError("All-prediction scenarios currently require ceiling=1.")
+    if factor == 1:
+        result = baseline_df.copy()
+        result.attrs = deepcopy(baseline_df.attrs)
+        result.attrs.setdefault("gompertz", {})["scenario_factor"] = 1.0
+        return result
+    if anchor_year not in baseline_df.columns or not isinstance(anchor_year, int):
+        raise ValueError(f"Missing integer BAU scenario anchor year: {anchor_year}")
+    if not first_stage_df.columns.equals(baseline_df.columns) or not first_stage_df.index.equals(baseline_df.index):
+        raise ValueError("BAU and first-stage matrices must have matching years and vehicle types.")
+    fit_years = [int(year) for year in first_stage_df.columns if anchor_year < year <= fit_end_year]
+    target_records = []
+    for year in fit_years:
+        original = float(first_stage_df.loc["electric", year])
+        if not isfinite(original) or not 0 <= original <= 1:
+            raise ValueError(f"Invalid first-stage EV target for {year}: {original}")
+        scaled = factor * original
+        target = min(1.0, max(0.0, scaled))
+        target_records.append({"year": year, "first_stage_share": original,
+                               "scaled_target_share": scaled, "target_share": target,
+                               "clipped": target != scaled})
+    fit = fit_projected_ev_gompertz(
+        fit_years, [row["target_share"] for row in target_records],
+        anchor_year, float(baseline_df.loc["electric", anchor_year]),
+    )
+    ev_shares = baseline_df.loc["electric"].copy()
+    future = baseline_df.columns[baseline_df.columns > anchor_year]
+    ev_shares.loc[future] = fit.predict(future)
+    result = replace_ev_shares(first_stage_df, ev_shares)
+    # Preserve the shared prefix exactly, including non-EV shares.
+    result.loc[:, result.columns <= anchor_year] = baseline_df.loc[:, baseline_df.columns <= anchor_year]
+    result.attrs = deepcopy(baseline_df.attrs)
+    result.attrs.setdefault("gompertz", {}).update({
+        "scenario_factor": float(factor), "scenario_fit": fit.to_dict(),
+        "scenario_targets": target_records,
+        "clipped_target_count": sum(row["clipped"] for row in target_records),
+    })
+    return result
+
+
+def predict_composition_trend(
+    initial_composition: dict[str, float],
+    average_growth: dict[str, float],
+    start_year=2021,
+    end_year=2030,
+    scenario=None,
+    *,
+    gompertz_fit_end_year=2040,
+) -> pd.DataFrame:
+    """Project entering-vehicle shares using an all-prediction Gompertz fit.
+
+    The first stage and calibration always cover the inclusive
+    ``gompertz_fit_end_year``. ``end_year`` only controls the exclusive export
+    end, so overlapping predictions are invariant to output horizon changes.
+    Explicit scenarios do not mutate global configuration. Fit diagnostics
+    and clipped scenario targets are available in ``result.attrs['gompertz']``.
+    ``refit_ev_with_gompertz`` remains the legacy two-anchor comparator.
+    """
+    if not isinstance(gompertz_fit_end_year, int) or gompertz_fit_end_year <= start_year:
+        raise ValueError("At least two first-stage calibration years are required.")
+    if not isinstance(end_year, int) or end_year <= start_year:
+        raise ValueError("The output interval must contain integer forecast years.")
+    if "electric" not in initial_composition:
+        raise ValueError("All-prediction Gompertz requires an observed EV initial share.")
+    raw = project_composition_first_stage(
+        initial_composition, average_growth, start_year, max(end_year, gompertz_fit_end_year + 1)
+    )
+    df = refit_ev_with_all_predictions(initial_composition, raw, gompertz_fit_end_year)
 
     scenario = SCN_CASE if scenario is None else scenario
+    df.attrs["gompertz"]["scenario"] = scenario
     if scenario in SCN_CONFIGS:
         cfg = SCN_CONFIGS[scenario]
-        prefix = cfg["file_prefix"]
-        
-        if cfg["type"] != "none":
+        if cfg["type"] == "ev_gompertz_scaled_projection":
+            df = apply_ev_gompertz_scenario_from_scaled_predictions(
+                df, raw, anchor_year=cfg.get("anchor_year", 2024), factor=cfg.get("factor", 1.25),
+                fit_end_year=gompertz_fit_end_year, ceiling=cfg.get("ceiling", 1.0),
+            )
+        elif cfg["type"] in {"ev_gompertz_scaled_target", "ev_logit_scaled_target"}:
+            # Compatibility for saved configurations and the GUI helper.
+            df = apply_ev_gompertz_scenario_from_scaled_target(
+                df, ev_type="electric", anchor_year=cfg.get("anchor_year", 2024),
+                target_year=cfg.get("target_year", 2035), target_factor=cfg.get("factor", 1.25),
+                lower=cfg.get("lower", 0.0), ceiling=cfg.get("ceiling", 1.0),
+                min_target_delta=cfg.get("min_target_delta", 1e-9),
+            )
+        elif cfg["type"] != "none":
             for year in df.columns:
                 electric_old = df.loc["electric", year]
-                if cfg["type"] in {"ev_gompertz_scaled_target", "ev_logit_scaled_target"}:
-                    df = apply_ev_gompertz_scenario_from_scaled_target(
-                        df,
-                        ev_type="electric",
-                        anchor_year=cfg.get("anchor_year", 2024),
-                        target_year=cfg.get("target_year", 2035),
-                        target_factor=cfg.get("factor", 1.25),
-                        lower=cfg.get("lower", 0.0),
-                        ceiling=cfg.get("ceiling", 1.0),
-                        min_target_delta=cfg.get("min_target_delta", 1e-9),
-                    )
-                    return df
-
                 if cfg["type"] == "scale":
                     electric_target = electric_old * cfg["factor"]
                 elif cfg["type"] == "target":
@@ -603,4 +699,4 @@ def predict_composition_trend(
                 df.loc["electric", year] = electric_target
 
 
-    return df
+    return df.loc[:, list(range(start_year, end_year))].copy()

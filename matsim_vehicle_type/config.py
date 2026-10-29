@@ -33,17 +33,15 @@ SCN_CONFIGS = {
         "file_prefix": "target"
     },
     "acc_adopt": {
-        "type": "ev_gompertz_scaled_target",
+        "type": "ev_gompertz_scaled_projection",
         "anchor_year": 2024,
-        "target_year": 2035,
         "factor": 1.25,
         "ceiling": 1.0,
         "file_prefix": "ev2035_25higher",
     },
     "del_adopt": {
-        "type": "ev_gompertz_scaled_target",
+        "type": "ev_gompertz_scaled_projection",
         "anchor_year": 2024,
-        "target_year": 2035,
         "factor": 0.75,
         "ceiling": 1.0,
         "file_prefix": "ev2035_25lower",
